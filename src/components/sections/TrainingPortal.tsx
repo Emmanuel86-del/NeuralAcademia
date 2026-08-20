@@ -2,7 +2,7 @@ import { fetchAITutorResponse } from '../../lib/aiHelper';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { GraduationCap, Plus, Clock, BarChart3, Users, BookOpen, Search, X, ArrowLeft, Trash2, Crown, Sparkles } from 'lucide-react';
+import { GraduationCap, Plus, Clock, BarChart3, Users, BookOpen, Search, X, ArrowLeft, Trash2, Crown, Sparkles, Video, FileText } from 'lucide-react';
 import type { Course, Enrollment, Module } from '@/types';
 import PremiumUpgrade, { PremiumBadge, LockedOverlay } from '@/components/PremiumUpgrade';
 import BuyTeamSeats from '@/components/BuyTeamSeats';
@@ -26,7 +26,6 @@ const levelBadge: Record<string, string> = {
   advanced: 'bg-rose-100 text-rose-700',
 };
 
-// Seed data definition placed outside the component scope
 const rawModulesData = [
   { course_id: 1, title: 'Module 1: HTML5, CSS3 & Responsive UI Design', description: 'Learn semantic HTML5, modern CSS styling, flexbox, and responsive design fundamentals.', order_index: 1, is_free_preview: true },
   { course_id: 1, title: 'Module 2: JavaScript ES6+ & DOM Manipulation', description: 'Master core JavaScript concepts, functions, async programming, and interactive DOM manipulation.', order_index: 2, is_free_preview: false },
@@ -66,7 +65,8 @@ export async function fetchCoursesWithModules() {
         description,
         order_index,
         is_free_preview,
-        image_url
+        image_url,
+        lessons (*)
       )
     `)
     .eq('is_published', true)
@@ -98,6 +98,10 @@ export default function TrainingPortal() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAICourseModal, setShowAICourseModal] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
+  
+  // State for adding new module in Educator View
+  const [newModuleTitle, setNewModuleTitle] = useState('');
+  const [newModuleDescription, setNewModuleDescription] = useState('');
 
   const isPremium = profile?.is_premium ?? false;
   const categories = ['all', ...Array.from(new Set(courses.map((c) => c.category)))];
@@ -138,6 +142,30 @@ export default function TrainingPortal() {
     setEnrollments((enrollRes.data as unknown as Enrollment[]) || []);
     setLoading(false);
   }
+
+  const reloadSingleCourse = async (courseId: number) => {
+    const { data } = await supabase
+      .from('courses')
+      .select(`
+        *,
+        modules (
+          id,
+          title,
+          description,
+          order_index,
+          is_free_preview,
+          image_url,
+          lessons (*)
+        )
+      `)
+      .eq('id', courseId)
+      .single();
+
+    if (data) {
+      setSelectedCourse(data as unknown as Course);
+      loadData();
+    }
+  };
 
   const filtered = courses.filter((c) => {
     const matchesSearch = c.title.toLowerCase().includes(search.toLowerCase()) || c.description.toLowerCase().includes(search.toLowerCase());
@@ -184,9 +212,55 @@ export default function TrainingPortal() {
       })
       .select('*')
       .maybeSingle();
+
     if (data) {
-      setCourses((prev) => [data as unknown as Course, ...prev]);
+      const created = data as unknown as Course;
+      setCourses((prev) => [created, ...prev]);
       setShowCreateModal(false);
+      // Auto-open course builder for newly created course
+      setSelectedCourse(created);
+    }
+  }
+
+  async function handleAddModule(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedCourse || !newModuleTitle.trim()) return;
+
+    const currentModules = selectedCourse.modules || [];
+    const nextIndex = currentModules.length + 1;
+
+    const { error } = await supabase.from('modules').insert([
+      {
+        course_id: selectedCourse.id,
+        title: newModuleTitle,
+        description: newModuleDescription,
+        order_index: nextIndex,
+        is_free_preview: false,
+      },
+    ]);
+
+    if (!error) {
+      setNewModuleTitle('');
+      setNewModuleDescription('');
+      reloadSingleCourse(selectedCourse.id);
+    }
+  }
+
+  async function handleAddLesson(moduleId: number, currentLessonsCount: number) {
+    const title = prompt('Enter Lesson Title:');
+    if (!title) return;
+
+    const { error } = await supabase.from('lessons').insert([
+      {
+        module_id: moduleId,
+        title,
+        lesson_type: 'video',
+        order_index: currentLessonsCount + 1,
+      },
+    ]);
+
+    if (!error && selectedCourse) {
+      reloadSingleCourse(selectedCourse.id);
     }
   }
 
@@ -194,6 +268,7 @@ export default function TrainingPortal() {
     return <div className="flex items-center justify-center h-64 text-slate-400">Loading courses...</div>;
   }
 
+  // Educator View: Full Course Builder
   if (selectedCourse) {
     if (isEducator) {
       return (
@@ -203,9 +278,10 @@ export default function TrainingPortal() {
             className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to catalog
+            Back to course list
           </button>
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
             <div className="h-32 relative overflow-hidden">
               {selectedCourse.image_url ? (
                 <img src={selectedCourse.image_url} alt={selectedCourse.title} className="absolute inset-0 w-full h-full object-cover" />
@@ -221,33 +297,90 @@ export default function TrainingPortal() {
                 <h2 className="text-2xl font-bold text-white">{selectedCourse.title}</h2>
               </div>
             </div>
+
             <div className="p-6">
-              <div className="flex flex-wrap gap-4 mb-6 text-sm text-slate-600">
-                <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" /> {selectedCourse.level}</span>
-                <span className="flex items-center gap-1.5"><Users className="w-4 h-4" /> {selectedCourse.category}</span>
-              </div>
               <p className="text-slate-700 leading-relaxed mb-6">{selectedCourse.description}</p>
-              
-              <div className="modules-list mb-6">
-                <h3 className="text-lg font-bold text-slate-900 mb-3">Course Modules</h3>
+
+              {/* Course Builder Section */}
+              <div className="space-y-6 mb-8">
+                <h3 className="text-lg font-bold text-slate-900">Curriculum Builder (Modules & Lessons)</h3>
+
                 {selectedCourse.modules && selectedCourse.modules.length > 0 ? (
                   [...selectedCourse.modules]
-                    .sort((a: Module, b: Module) => a.order_index - b.order_index)
-                    .map((module: Module) => (
-                      <div key={module.id} className="module-item p-4 bg-slate-50 border border-slate-100 rounded-xl mb-3">
-                        <div className="module-header flex items-center justify-between mb-1">
-                          <span className="font-semibold text-slate-900">{module.order_index}. {module.title}</span>
-                          {module.is_free_preview && <span className="badge px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">Free Preview</span>}
+                    .sort((a: any, b: any) => a.order_index - b.order_index)
+                    .map((module: any, idx: number) => (
+                      <div key={module.id} className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-semibold text-slate-900 text-base">
+                            Module {idx + 1}: {module.title}
+                          </h4>
+                          {module.is_free_preview && (
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">Free Preview</span>
+                          )}
                         </div>
-                        <p className="text-sm text-slate-600">{module.description}</p>
+                        {module.description && <p className="text-sm text-slate-600 mb-4">{module.description}</p>}
+
+                        {/* Lessons List inside Module */}
+                        <div className="space-y-2 pl-4 border-l-2 border-slate-200 my-3">
+                          {module.lessons && module.lessons.length > 0 ? (
+                            module.lessons
+                              .sort((a: any, b: any) => a.order_index - b.order_index)
+                              .map((lesson: any, lIdx: number) => (
+                                <div key={lesson.id} className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-sm">
+                                  <div className="flex items-center gap-2">
+                                    <Video className="w-4 h-4 text-slate-400" />
+                                    <span>{lIdx + 1}. {lesson.title}</span>
+                                  </div>
+                                  <span className="text-xs uppercase bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                                    {lesson.lesson_type || 'video'}
+                                  </span>
+                                </div>
+                              ))
+                          ) : (
+                            <p className="text-xs text-slate-400 italic">No lessons in this module yet.</p>
+                          )}
+
+                          <button
+                            onClick={() => handleAddLesson(module.id, module.lessons?.length || 0)}
+                            className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 pt-2"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Add Lesson
+                          </button>
+                        </div>
                       </div>
                     ))
                 ) : (
-                  <p className="text-sm text-slate-500">No modules available for this course yet.</p>
+                  <p className="text-sm text-slate-500 italic">No modules added yet. Add your first module below.</p>
                 )}
+
+                {/* Add Module Form */}
+                <form onSubmit={handleAddModule} className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                  <h4 className="text-sm font-semibold text-slate-800">Add New Module</h4>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Module Title (e.g. Module 1: Core Concepts)..."
+                    value={newModuleTitle}
+                    onChange={(e) => setNewModuleTitle(e.target.value)}
+                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-200 focus:border-blue-500 outline-none"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Module Description (optional)..."
+                    value={newModuleDescription}
+                    onChange={(e) => setNewModuleDescription(e.target.value)}
+                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-200 focus:border-blue-500 outline-none"
+                  />
+                  <button
+                    type="submit"
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    <Plus className="w-4 h-4" /> Add Module
+                  </button>
+                </form>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-4 border-t border-slate-200">
                 <button
                   onClick={() => deleteCourse(selectedCourse.id)}
                   className="px-4 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors"
