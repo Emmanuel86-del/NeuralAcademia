@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { tutorTopics, generateTutorResponse } from '@/data/tutorData';
-import { Bot, Send, Plus, MessageSquare, Trash2, Sparkles, Brain, Network, MessageSquare as MsgIcon, Shield, Code, Clock } from 'lucide-react';
+import { Bot, Send, Plus, MessageSquare, Trash2, Sparkles, Brain, Network, MessageSquare as MsgIcon, Shield, Code, Clock, Lock } from 'lucide-react';
 import type { TutorSession, TutorMessage } from '@/types';
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -17,11 +17,43 @@ export default function PersonalTutor() {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [aiEnabled, setAiEnabled] = useState(true); // Tracks global platform setting switch
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadSessions();
+    checkAiSwitch();
+
+    // Optional realtime subscription to listen if teacher/admin toggles switch while student is viewing
+    const channel = supabase
+      .channel('platform_settings_changes')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'platform_settings', filter: 'id=eq.global_config' },
+        (payload) => {
+          if (payload.new && typeof payload.new.ai_tutor_enabled === 'boolean') {
+            setAiEnabled(payload.new.ai_tutor_enabled);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
+
+  async function checkAiSwitch() {
+    const { data } = await supabase
+      .from('platform_settings')
+      .select('ai_tutor_enabled')
+      .eq('id', 'global_config')
+      .single();
+
+    if (data && typeof data.ai_tutor_enabled === 'boolean') {
+      setAiEnabled(data.ai_tutor_enabled);
+    }
+  }
 
   useEffect(() => {
     if (activeSession) {
@@ -51,7 +83,7 @@ export default function PersonalTutor() {
   }
 
   async function createNewSession(topic?: string) {
-    if (!user) return null;
+    if (!aiEnabled || !user) return null;
 
     const welcomeMsg: TutorMessage = {
       role: 'tutor',
@@ -95,6 +127,7 @@ export default function PersonalTutor() {
   }
 
   async function sendMessage(text?: string) {
+    if (!aiEnabled) return;
     const messageText = text || input.trim();
     if (!messageText || !activeSession || isTyping) return;
 
@@ -109,7 +142,6 @@ export default function PersonalTutor() {
     setIsTyping(true);
 
     try {
-      // PROPERLY AWAIT THE ASYNC AI RESPONSE
       const tutorResponse = await generateTutorResponse(messageText);
 
       const tutorMsg: TutorMessage = {
@@ -149,7 +181,7 @@ export default function PersonalTutor() {
   }
 
   async function startWithTopic(topicPrompt: string, topicName: string) {
-    if (!user) return;
+    if (!aiEnabled || !user) return;
     
     const welcomeMsg: TutorMessage = {
       role: 'tutor',
@@ -166,7 +198,6 @@ export default function PersonalTutor() {
     setIsTyping(true);
 
     try {
-      // PROPERLY AWAIT THE ASYNC AI RESPONSE
       const tutorResponse = await generateTutorResponse(topicPrompt);
       const tutorMsg: TutorMessage = {
         role: 'tutor',
@@ -206,13 +237,14 @@ export default function PersonalTutor() {
   }
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-8rem)] animate-fade-in">
+    <div className="flex gap-4 h-[calc(100vh-8rem)] animate-fade-in relative">
       {/* Session list */}
       <div className="w-64 flex-shrink-0 bg-white rounded-2xl border border-slate-200 flex flex-col hidden md:flex">
         <div className="p-4 border-b border-slate-100">
           <button
             onClick={() => createNewSession()}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors"
+            disabled={!aiEnabled}
+            className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors"
           >
             <Plus className="w-4 h-4" />
             New Chat
@@ -256,7 +288,15 @@ export default function PersonalTutor() {
       </div>
 
       {/* Chat area */}
-      <div className="flex-1 bg-white rounded-2xl border border-slate-200 flex flex-col min-w-0">
+      <div className="flex-1 bg-white rounded-2xl border border-slate-200 flex flex-col min-w-0 relative">
+        {/* Master Switch Lock Banner Overlay if AI is disabled */}
+        {!aiEnabled && (
+          <div className="absolute top-0 inset-x-0 bg-red-600 text-white px-4 py-2.5 flex items-center justify-center gap-2 text-xs font-semibold z-30 shadow-md">
+            <Lock className="w-4 h-4" />
+            AI Tutor is currently disabled by instructors/administrators (Exam lock active).
+          </div>
+        )}
+
         {!activeSession ? (
           <div className="flex-1 flex items-center justify-center p-6">
             <div className="max-w-2xl w-full">
@@ -275,7 +315,8 @@ export default function PersonalTutor() {
                     <button
                       key={topic.id}
                       onClick={() => startWithTopic(topic.prompt, topic.name)}
-                      className="flex items-start gap-3 p-4 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-xl transition-all text-left group"
+                      disabled={!aiEnabled}
+                      className="flex items-start gap-3 p-4 bg-slate-50 hover:bg-blue-50 disabled:opacity-50 disabled:hover:bg-slate-50 border border-slate-200 hover:border-blue-200 rounded-xl transition-all text-left group"
                     >
                       <div className="w-10 h-10 bg-white group-hover:bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors">
                         <Icon className="w-5 h-5 text-blue-600" />
@@ -291,7 +332,8 @@ export default function PersonalTutor() {
 
               <button
                 onClick={() => createNewSession()}
-                className="w-full mt-4 flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-colors"
+                disabled={!aiEnabled}
+                className="w-full mt-4 flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium rounded-xl transition-colors"
               >
                 <Plus className="w-5 h-5" />
                 Start a free-form chat
@@ -369,13 +411,13 @@ export default function PersonalTutor() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                  placeholder="Ask your AI tutor anything..."
-                  disabled={isTyping}
+                  placeholder={aiEnabled ? "Ask your AI tutor anything..." : "AI Tutor is currently locked..."}
+                  disabled={isTyping || !aiEnabled}
                   className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all disabled:opacity-50"
                 />
                 <button
                   onClick={() => sendMessage()}
-                  disabled={!input.trim() || isTyping}
+                  disabled={!input.trim() || isTyping || !aiEnabled}
                   className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   <Send className="w-4 h-4" />
