@@ -66,12 +66,16 @@ export async function fetchCoursesWithModules() {
         order_index,
         is_free_preview,
         image_url,
-        lessons (*)
+        lessons (
+          id,
+          title,
+          lesson_type,
+          order_index
+        )
       )
     `)
     .eq('is_published', true)
-    .order('created_at', { ascending: false })
-    .order('order_index', { referencedTable: 'modules', ascending: true });
+    .order('created_at', { ascending: false });
 
   if (error) {
     console.error('Error fetching courses and modules:', error);
