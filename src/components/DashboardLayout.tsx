@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { Brain, LayoutDashboard, Bot, Building2, ClipboardCheck, Languages, LogOut, Menu, X, GraduationCap, ChevronDown, Eye, Presentation, Activity } from 'lucide-react';
+import { Brain, LayoutDashboard, Bot, Building2, ClipboardCheck, Languages, LogOut, Menu, X, GraduationCap, ChevronDown, Eye, Presentation, Activity, KeyRound } from 'lucide-react';
 import type { ViewMode } from '@/types';
 
 export type DashboardSection = 'overview' | 'tutor' | 'training' | 'assessment' | 'language' | 'student-dashboard';
@@ -28,7 +28,6 @@ const adminNav = [
   { id: 'language' as const, label: 'Language Coach', icon: Languages },
 ];
 
-// Teacher navigation excludes the student progress view
 const teacherNav = [
   { id: 'overview' as const, label: 'Teacher Dashboard', icon: LayoutDashboard },
   { id: 'training' as const, label: 'My Courses', icon: Presentation },
@@ -43,10 +42,111 @@ const viewAccent: Record<ViewMode, string> = {
   teacher: 'from-amber-500 to-orange-500',
 };
 
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const { updatePassword } = useAuth();
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setLoading(true);
+    const { error: err } = await updatePassword(newPassword);
+    setLoading(false);
+
+    if (err) {
+      setError(err);
+    } else {
+      setSuccess(true);
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600">
+            <KeyRound className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">Change Password</h3>
+            <p className="text-xs text-slate-500">Enter your new secure password below.</p>
+          </div>
+        </div>
+
+        {success ? (
+          <div className="py-6 text-center text-emerald-600 font-semibold text-sm">
+            Password updated successfully!
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">New Password</label>
+              <input
+                type="password"
+                required
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Confirm Password</label>
+              <input
+                type="password"
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm"
+              />
+            </div>
+            {error && <p className="text-xs text-red-600">{error}</p>}
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {loading ? 'Saving...' : 'Save Password'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardLayout({ active, onNavigate, children }: SidebarProps & { children: React.ReactNode }) {
   const { profile, signOut, effectiveRole, viewMode, setViewMode } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const nav = effectiveRole === 'corporate_admin' ? adminNav : effectiveRole === 'teacher' ? teacherNav : studentNav;
   const isAdmin = effectiveRole === 'corporate_admin';
@@ -58,6 +158,8 @@ export default function DashboardLayout({ active, onNavigate, children }: Sideba
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
+      {showPasswordModal && <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />}
+      
       {/* Sidebar */}
       <aside
         className={`fixed lg:sticky top-0 left-0 z-40 h-screen w-64 bg-slate-900 text-slate-100 flex flex-col transition-transform duration-300 ${
@@ -109,8 +211,15 @@ export default function DashboardLayout({ active, onNavigate, children }: Sideba
             </div>
           </div>
           <button
+            onClick={() => setShowPasswordModal(true)}
+            className="w-full flex items-center gap-3 px-3 py-2 mt-1 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+          >
+            <KeyRound className="w-5 h-5" />
+            Change Password
+          </button>
+          <button
             onClick={signOut}
-            className="w-full flex items-center gap-3 px-3 py-2.5 mt-1 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+            className="w-full flex items-center gap-3 px-3 py-2 mt-0.5 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
           >
             <LogOut className="w-5 h-5" />
             Sign out
@@ -177,6 +286,16 @@ export default function DashboardLayout({ active, onNavigate, children }: Sideba
                         <span className="text-xs text-slate-400">Role: {roleLabel}</span>
                       </div>
                     </div>
+                    <button
+                      onClick={() => {
+                        setShowPasswordModal(true);
+                        setProfileOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      <KeyRound className="w-4 h-4 text-slate-500" />
+                      Change Password
+                    </button>
                     <button
                       onClick={() => {
                         signOut();
