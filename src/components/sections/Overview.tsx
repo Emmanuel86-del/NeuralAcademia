@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { Bot, GraduationCap, ClipboardCheck, Languages, Award, Flame, ArrowRight, BookOpen, Target, Users, Presentation, Building2, Search } from 'lucide-react';
+import { Bot, GraduationCap, ClipboardCheck, Languages, Award, Flame, ArrowRight, BookOpen, Target, Users, Presentation, Building2, Search, Power } from 'lucide-react';
 import type { DashboardSection } from '@/components/DashboardLayout';
 import type { Enrollment, AssessmentResult, LanguageProgress, TutorSession, Course } from '@/types';
 
@@ -27,6 +27,7 @@ export default function Overview({ onNavigate }: OverviewProps) {
   const [students, setStudents] = useState<StudentRecord[]>([]);
   const [studentSearch, setStudentSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [aiEnabled, setAiEnabled] = useState(true); // AI Tutor Master Switch state
 
   const isAdmin = effectiveRole === 'corporate_admin';
   const isTeacher = effectiveRole === 'teacher';
@@ -35,6 +36,17 @@ export default function Overview({ onNavigate }: OverviewProps) {
     async function loadData() {
       if (!profile) return;
       const userId = profile.id;
+
+      // Fetch platform settings toggle state from Supabase
+      const { data: settingsData } = await supabase
+        .from('platform_settings')
+        .select('ai_tutor_enabled')
+        .eq('id', 'global_config')
+        .single();
+
+      if (settingsData && typeof settingsData.ai_tutor_enabled === 'boolean') {
+        setAiEnabled(settingsData.ai_tutor_enabled);
+      }
 
       const queries = [
         supabase.from('enrollments').select('*, course:courses(*)').eq('user_id', userId),
@@ -73,6 +85,22 @@ export default function Overview({ onNavigate }: OverviewProps) {
     }
     loadData();
   }, [profile, isTeacher, isAdmin]);
+
+  // Handler to update database when the switch is toggled
+  const handleToggleAi = async () => {
+    const newState = !aiEnabled;
+    setAiEnabled(newState); // Optimistic UI update
+
+    const { error } = await supabase
+      .from('platform_settings')
+      .update({ ai_tutor_enabled: newState, updated_at: new Date().toISOString() })
+      .eq('id', 'global_config');
+
+    if (error) {
+      console.error('Error updating AI switch status:', error.message);
+      setAiEnabled(!newState); // Revert back if DB update fails
+    }
+  };
 
   const inProgressCourses = enrollments.filter((e) => e.status === 'in_progress').length;
   const completedCourses = enrollments.filter((e) => e.status === 'completed').length;
@@ -146,6 +174,27 @@ export default function Overview({ onNavigate }: OverviewProps) {
           </p>
         </div>
       </div>
+
+      {/* AI Tutor Master Control Switch (Visible to Teachers & Admins Only) */}
+      {(isTeacher || isAdmin) && (
+        <div className="flex items-center justify-between p-4 bg-slate-900 text-white rounded-xl shadow-sm">
+          <div>
+            <span className="text-sm font-bold block">AI Tutor Exam Switch</span>
+            <span className="text-xs text-slate-400">
+              {aiEnabled ? 'Status: ON (Accessible to students)' : 'Status: OFF (Exam lock active)'}
+            </span>
+          </div>
+          <button
+            onClick={handleToggleAi}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+              aiEnabled ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-red-600 hover:bg-red-700 text-white'
+            }`}
+          >
+            <Power className="w-4 h-4" />
+            {aiEnabled ? 'Turn OFF' : 'Turn ON'}
+          </button>
+        </div>
+      )}
 
       {isTeacher && !loading && (
         <div className="space-y-6">
