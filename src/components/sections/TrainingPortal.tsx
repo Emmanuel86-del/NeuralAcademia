@@ -196,7 +196,7 @@ export default function TrainingPortal() {
     setSelectedCourse(null);
   }
 
-  async function createCourse(courseData: Partial<Course>) {
+ async function createCourse(courseData: Partial<Course>) {
     if (!user) return;
     const { data } = await supabase
       .from('courses')
@@ -206,7 +206,7 @@ export default function TrainingPortal() {
         category: courseData.category || 'AI Fundamentals',
         level: courseData.level || 'beginner',
         duration_hours: courseData.duration_hours || 1,
-        instructor: courseData.instructor || profile.full_name || 'Instructor',
+        instructor: courseData.instructor || profile?.full_name || 'Instructor',
         thumbnail_color: courseData.thumbnail_color || 'blue',
         is_published: true,
         created_by: user.id,
@@ -222,6 +222,16 @@ export default function TrainingPortal() {
       setSelectedCourse(created);
     }
   }
+
+  // State hooks for new module form input
+  const [newModuleTitle, setNewModuleTitle] = useState('');
+  const [newModuleDescription, setNewModuleDescription] = useState('');
+
+  // Fixed async function wrapper for adding modules
+  async function handleAddModule(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedCourse) return;
+
     const currentModules = selectedCourse.modules || [];
     const nextIndex = currentModules.length + 1;
 
@@ -242,6 +252,11 @@ export default function TrainingPortal() {
     }
   }
 
+  // Fixed async function wrapper for adding lessons
+  async function handleAddLesson(moduleId: number, currentLessonsCount: number) {
+    const title = prompt('Enter lesson title:');
+    if (!title) return;
+
     const { error } = await supabase.from('lessons').insert([
       {
         module_id: moduleId,
@@ -260,7 +275,7 @@ export default function TrainingPortal() {
     return <div className="flex items-center justify-center h-64 text-slate-400">Loading courses...</div>;
   }
 
-   if (selectedCourse) {
+  if (selectedCourse) {
     if (isEducator) {
       return (
         <CourseBuilder
