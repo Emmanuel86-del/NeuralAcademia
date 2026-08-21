@@ -2,7 +2,8 @@ import { fetchAITutorResponse } from '../../lib/aiHelper';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { GraduationCap, Plus, Clock, BarChart3, Users, BookOpen, Search, X, ArrowLeft, Trash2, Crown, Sparkles, Video, FileText } from 'lucide-react';
+import { GraduationCap, Plus, Clock, BarChart3, Users, BookOpen, Search, X, Trash2, Crown, Sparkles } from 'lucide-react';
+import CourseBuilder from '@/components/CourseBuilder';
 import type { Course, Enrollment, Module } from '@/types';
 import PremiumUpgrade, { PremiumBadge, LockedOverlay } from '@/components/PremiumUpgrade';
 import BuyTeamSeats from '@/components/BuyTeamSeats';
@@ -102,10 +103,6 @@ export default function TrainingPortal() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAICourseModal, setShowAICourseModal] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
-  
-  // State for adding new module in Educator View
-  const [newModuleTitle, setNewModuleTitle] = useState('');
-  const [newModuleDescription, setNewModuleDescription] = useState('');
 
   const isPremium = profile?.is_premium ?? false;
   const categories = ['all', ...Array.from(new Set(courses.map((c) => c.category)))];
@@ -225,11 +222,6 @@ export default function TrainingPortal() {
       setSelectedCourse(created);
     }
   }
-
-  async function handleAddModule(e: React.FormEvent) {
-    e.preventDefault();
-    if (!selectedCourse || !newModuleTitle.trim()) return;
-
     const currentModules = selectedCourse.modules || [];
     const nextIndex = currentModules.length + 1;
 
@@ -250,10 +242,6 @@ export default function TrainingPortal() {
     }
   }
 
-  async function handleAddLesson(moduleId: number, currentLessonsCount: number) {
-    const title = prompt('Enter Lesson Title:');
-    if (!title) return;
-
     const { error } = await supabase.from('lessons').insert([
       {
         module_id: moduleId,
@@ -272,18 +260,31 @@ export default function TrainingPortal() {
     return <div className="flex items-center justify-center h-64 text-slate-400">Loading courses...</div>;
   }
 
-  // Educator View: Full Course Builder
-  if (selectedCourse) {
+   if (selectedCourse) {
     if (isEducator) {
       return (
-        <div className="animate-fade-in space-y-6">
-          <button
-            onClick={() => setSelectedCourse(null)}
-            className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to course list
-          </button>
+        <CourseBuilder
+          course={selectedCourse}
+          onBack={() => setSelectedCourse(null)}
+          onCourseUpdated={loadData}
+          onDeleteCourse={deleteCourse}
+        />
+      );
+    }
+
+    return (
+      <CourseLMS
+        course={selectedCourse}
+        initialModuleId={selectedModuleId}
+        onBack={() => {
+          setSelectedCourse(null);
+          setSelectedModuleId(null);
+        }}
+        onEnroll={async () => { await enroll(selectedCourse.id); }}
+      />
+    );
+  }
+
 
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
             <div className="h-32 relative overflow-hidden">
