@@ -55,7 +55,7 @@ const rawModulesData = [
   { course_id: 5, title: 'Module 5: Deploying AI Models via APIs', description: 'Package machine learning models into web APIs for integration into web applications.', order_index: 5, is_free_preview: false }
 ];
 
-export async function fetchCoursesWithModules() {
+async function fetchCoursesWithModules() {
   const { data, error } = await supabase
     .from('courses')
     .select(`
