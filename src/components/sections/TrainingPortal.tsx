@@ -2,7 +2,7 @@ import { fetchAITutorResponse } from '../../lib/aiHelper';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { GraduationCap, Plus, Clock, BarChart3, Users, BookOpen, Search, X, Trash2, Crown, Sparkles } from 'lucide-react';
+import { GraduationCap, Plus, Clock, BarChart3, Users, BookOpen, Search, X, Trash2, Crown, Sparkles, Video } from 'lucide-react';
 import CourseBuilder from '@/components/CourseBuilder';
 import type { Course, Enrollment, Module } from '@/types';
 import PremiumUpgrade, { PremiumBadge, LockedOverlay } from '@/components/PremiumUpgrade';
@@ -104,6 +104,9 @@ export default function TrainingPortal() {
   const [showAICourseModal, setShowAICourseModal] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
 
+  const [newModuleTitle, setNewModuleTitle] = useState('');
+  const [newModuleDescription, setNewModuleDescription] = useState('');
+
   const isPremium = profile?.is_premium ?? false;
   const categories = ['all', ...Array.from(new Set(courses.map((c) => c.category)))];
 
@@ -196,7 +199,7 @@ export default function TrainingPortal() {
     setSelectedCourse(null);
   }
 
- async function createCourse(courseData: Partial<Course>) {
+  async function createCourse(courseData: Partial<Course>) {
     if (!user) return;
     const { data } = await supabase
       .from('courses')
@@ -218,16 +221,10 @@ export default function TrainingPortal() {
       const created = data as unknown as Course;
       setCourses((prev) => [created, ...prev]);
       setShowCreateModal(false);
-      // Auto-open course builder for newly created course
       setSelectedCourse(created);
     }
   }
 
-  // State hooks for new module form input
-  const [newModuleTitle, setNewModuleTitle] = useState('');
-  const [newModuleDescription, setNewModuleDescription] = useState('');
-
-  // Fixed async function wrapper for adding modules
   async function handleAddModule(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedCourse) return;
@@ -252,7 +249,6 @@ export default function TrainingPortal() {
     }
   }
 
-  // Fixed async function wrapper for adding lessons
   async function handleAddLesson(moduleId: number, currentLessonsCount: number) {
     const title = prompt('Enter lesson title:');
     if (!title) return;
@@ -284,134 +280,6 @@ export default function TrainingPortal() {
           onCourseUpdated={loadData}
           onDeleteCourse={deleteCourse}
         />
-      );
-    }
-
-    return (
-      <CourseLMS
-        course={selectedCourse}
-        initialModuleId={selectedModuleId}
-        onBack={() => {
-          setSelectedCourse(null);
-          setSelectedModuleId(null);
-        }}
-        onEnroll={async () => { await enroll(selectedCourse.id); }}
-      />
-    );
-  }
-
-
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-            <div className="h-32 relative overflow-hidden">
-              {selectedCourse.image_url ? (
-                <img src={selectedCourse.image_url} alt={selectedCourse.title} className="absolute inset-0 w-full h-full object-cover" />
-              ) : (
-                <div className={`absolute inset-0 bg-gradient-to-br ${colorClasses[selectedCourse.thumbnail_color || 'blue']?.gradient || colorClasses.blue.gradient}`} />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${levelBadge[selectedCourse.level] || levelBadge.beginner}`}>{selectedCourse.level}</span>
-                  <span className="px-2.5 py-0.5 bg-white/20 backdrop-blur-sm text-white rounded-full text-xs font-medium">{selectedCourse.category}</span>
-                </div>
-                <h2 className="text-2xl font-bold text-white">{selectedCourse.title}</h2>
-              </div>
-            </div>
-
-            <div className="p-6">
-              <p className="text-slate-700 leading-relaxed mb-6">{selectedCourse.description}</p>
-
-              {/* Course Builder Section */}
-              <div className="space-y-6 mb-8">
-                <h3 className="text-lg font-bold text-slate-900">Curriculum Builder (Modules & Lessons)</h3>
-
-                {selectedCourse.modules && selectedCourse.modules.length > 0 ? (
-                  [...selectedCourse.modules]
-                    .sort((a: any, b: any) => a.order_index - b.order_index)
-                    .map((module: any, idx: number) => (
-                      <div key={module.id} className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold text-slate-900 text-base">
-                            Module {idx + 1}: {module.title}
-                          </h4>
-                          {module.is_free_preview && (
-                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">Free Preview</span>
-                          )}
-                        </div>
-                        {module.description && <p className="text-sm text-slate-600 mb-4">{module.description}</p>}
-
-                        {/* Lessons List inside Module */}
-                        <div className="space-y-2 pl-4 border-l-2 border-slate-200 my-3">
-                          {module.lessons && module.lessons.length > 0 ? (
-                            module.lessons
-                              .sort((a: any, b: any) => a.order_index - b.order_index)
-                              .map((lesson: any, lIdx: number) => (
-                                <div key={lesson.id} className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-200 text-sm">
-                                  <div className="flex items-center gap-2">
-                                    <Video className="w-4 h-4 text-slate-400" />
-                                    <span>{lIdx + 1}. {lesson.title}</span>
-                                  </div>
-                                  <span className="text-xs uppercase bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
-                                    {lesson.lesson_type || 'video'}
-                                  </span>
-                                </div>
-                              ))
-                          ) : (
-                            <p className="text-xs text-slate-400 italic">No lessons in this module yet.</p>
-                          )}
-
-                          <button
-                            onClick={() => handleAddLesson(module.id, module.lessons?.length || 0)}
-                            className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 pt-2"
-                          >
-                            <Plus className="w-3.5 h-3.5" /> Add Lesson
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                ) : (
-                  <p className="text-sm text-slate-500 italic">No modules added yet. Add your first module below.</p>
-                )}
-
-                {/* Add Module Form */}
-                <form onSubmit={handleAddModule} className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
-                  <h4 className="text-sm font-semibold text-slate-800">Add New Module</h4>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Module Title (e.g. Module 1: Core Concepts)..."
-                    value={newModuleTitle}
-                    onChange={(e) => setNewModuleTitle(e.target.value)}
-                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-200 focus:border-blue-500 outline-none"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Module Description (optional)..."
-                    value={newModuleDescription}
-                    onChange={(e) => setNewModuleDescription(e.target.value)}
-                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-200 focus:border-blue-500 outline-none"
-                  />
-                  <button
-                    type="submit"
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-                  >
-                    <Plus className="w-4 h-4" /> Add Module
-                  </button>
-                </form>
-              </div>
-
-              <div className="flex gap-3 pt-4 border-t border-slate-200">
-                <button
-                  onClick={() => deleteCourse(selectedCourse.id)}
-                  className="px-4 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete course
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
       );
     }
 
@@ -476,7 +344,6 @@ export default function TrainingPortal() {
         </div>
       )}
 
-      {/* Conditionally render upgrade options only for students */}
       {isAdmin && <BuyTeamSeats />}
       {isStudent && !isPremium && <PremiumUpgrade />}
 
