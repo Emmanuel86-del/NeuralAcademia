@@ -209,7 +209,7 @@ export default function TrainingPortal() {
         category: courseData.category || 'AI Fundamentals',
         level: courseData.level || 'beginner',
         duration_hours: courseData.duration_hours || 1,
-        instructor: courseData.instructor || profile?.full_name || 'Instructor',
+        instructor: courseData.instructor || profile.full_name || 'Instructor',
         thumbnail_color: courseData.thumbnail_color || 'blue',
         is_published: true,
         created_by: user.id,
