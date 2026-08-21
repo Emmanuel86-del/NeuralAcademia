@@ -55,6 +55,7 @@ const rawModulesData = [
   { course_id: 5, title: 'Module 5: Deploying AI Models via APIs', description: 'Package machine learning models into web APIs for integration into web applications.', order_index: 5, is_free_preview: false }
 ];
 
+// Removed 'export' to fix Vite Fast Refresh warning
 async function fetchCoursesWithModules() {
   const { data, error } = await supabase
     .from('courses')
@@ -75,7 +76,6 @@ async function fetchCoursesWithModules() {
         )
       )
     `)
-    .eq('is_published', true)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -103,9 +103,6 @@ export default function TrainingPortal() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAICourseModal, setShowAICourseModal] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
-
-  const [newModuleTitle, setNewModuleTitle] = useState('');
-  const [newModuleDescription, setNewModuleDescription] = useState('');
 
   const isPremium = profile?.is_premium ?? false;
   const categories = ['all', ...Array.from(new Set(courses.map((c) => c.category)))];
@@ -146,30 +143,6 @@ export default function TrainingPortal() {
     setEnrollments((enrollRes.data as unknown as Enrollment[]) || []);
     setLoading(false);
   }
-
-  const reloadSingleCourse = async (courseId: number) => {
-    const { data } = await supabase
-      .from('courses')
-      .select(`
-        *,
-        modules (
-          id,
-          title,
-          description,
-          order_index,
-          is_free_preview,
-          image_url,
-          lessons (*)
-        )
-      `)
-      .eq('id', courseId)
-      .single();
-
-    if (data) {
-      setSelectedCourse(data as unknown as Course);
-      loadData();
-    }
-  };
 
   const filtered = courses.filter((c) => {
     const matchesSearch = c.title.toLowerCase().includes(search.toLowerCase()) || c.description.toLowerCase().includes(search.toLowerCase());
@@ -222,48 +195,6 @@ export default function TrainingPortal() {
       setCourses((prev) => [created, ...prev]);
       setShowCreateModal(false);
       setSelectedCourse(created);
-    }
-  }
-
-  async function handleAddModule(e: React.FormEvent) {
-    e.preventDefault();
-    if (!selectedCourse) return;
-
-    const currentModules = selectedCourse.modules || [];
-    const nextIndex = currentModules.length + 1;
-
-    const { error } = await supabase.from('modules').insert([
-      {
-        course_id: selectedCourse.id,
-        title: newModuleTitle,
-        description: newModuleDescription,
-        order_index: nextIndex,
-        is_free_preview: false,
-      },
-    ]);
-
-    if (!error) {
-      setNewModuleTitle('');
-      setNewModuleDescription('');
-      reloadSingleCourse(selectedCourse.id);
-    }
-  }
-
-  async function handleAddLesson(moduleId: number, currentLessonsCount: number) {
-    const title = prompt('Enter lesson title:');
-    if (!title) return;
-
-    const { error } = await supabase.from('lessons').insert([
-      {
-        module_id: moduleId,
-        title,
-        lesson_type: 'video',
-        order_index: currentLessonsCount + 1,
-      },
-    ]);
-
-    if (!error && selectedCourse) {
-      reloadSingleCourse(selectedCourse.id);
     }
   }
 
@@ -402,7 +333,7 @@ export default function TrainingPortal() {
       {filtered.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
           <GraduationCap className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-          <p>No courses found. Try a different search or filter.</p>
+          <p>No courses found. Try creating one using "+ Manual" or "Create AI Course".</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
