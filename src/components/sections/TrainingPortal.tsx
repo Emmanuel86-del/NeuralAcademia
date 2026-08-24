@@ -2,7 +2,7 @@ import { fetchAITutorResponse } from '../../lib/aiHelper';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { GraduationCap, Plus, Clock, BarChart3, Users, BookOpen, Search, Crown, Sparkles } from 'lucide-react';
+import { GraduationCap, Plus, Clock, BarChart3, Users, BookOpen, Search, X, Trash2, Crown, Sparkles, Video } from 'lucide-react';
 import CourseBuilder from '@/components/CourseBuilder';
 import type { Course, Enrollment, Module } from '@/types';
 import PremiumUpgrade, { PremiumBadge, LockedOverlay } from '@/components/PremiumUpgrade';
@@ -100,9 +100,9 @@ export default function TrainingPortal() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [selectedModuleId, setSelectedModuleId] = useState<number | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAICourseModal, setShowAICourseModal] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const [creatingManual, setCreatingManual] = useState(false);
 
   const isPremium = profile?.is_premium ?? false;
   const categories = ['all', ...Array.from(new Set(courses.map((c) => c.category)))];
@@ -113,7 +113,7 @@ export default function TrainingPortal() {
 
   async function loadData() {
     if (!profile) return;
-
+    
     const [fetchedCoursesData, enrollRes] = await Promise.all([
       fetchCoursesWithModules(),
       supabase.from('enrollments').select('*, course:courses(*)').eq('user_id', profile.id),
@@ -172,40 +172,28 @@ export default function TrainingPortal() {
     setSelectedCourse(null);
   }
 
-  // Creates a bare course row the instant "Manual" is clicked, then drops the
-  // educator straight into the full-page CourseBuilder to fill in everything
-  // (details, modules, lessons) in one continuous flow — no separate popup.
-  async function handleManualCreate() {
-    if (!user || creatingManual) return;
-    setCreatingManual(true);
-
-    const { data, error } = await supabase
+  async function createCourse(courseData: Partial<Course>) {
+    if (!user) return;
+    const { data } = await supabase
       .from('courses')
       .insert({
-        title: 'Untitled Course',
-        description: '',
-        category: 'AI Fundamentals',
-        level: 'beginner',
-        duration_hours: 1,
-        instructor: profile?.full_name || 'Instructor',
-        thumbnail_color: 'blue',
+        title: courseData.title,
+        description: courseData.description,
+        category: courseData.category || 'AI Fundamentals',
+        level: courseData.level || 'beginner',
+        duration_hours: courseData.duration_hours || 1,
+        instructor: courseData.instructor || profile.full_name || 'Instructor',
+        thumbnail_color: courseData.thumbnail_color || 'blue',
         is_published: true,
         created_by: user.id,
       })
       .select('*')
-      .single();
-
-    setCreatingManual(false);
-
-    if (error) {
-      console.error('Error creating course:', error);
-      alert('Failed to create course. Please try again.');
-      return;
-    }
+      .maybeSingle();
 
     if (data) {
       const created = data as unknown as Course;
       setCourses((prev) => [created, ...prev]);
+      setShowCreateModal(false);
       setSelectedCourse(created);
     }
   }
@@ -219,10 +207,7 @@ export default function TrainingPortal() {
       return (
         <CourseBuilder
           course={selectedCourse}
-          onBack={() => {
-            setSelectedCourse(null);
-            loadData();
-          }}
+          onBack={() => setSelectedCourse(null)}
           onCourseUpdated={loadData}
           onDeleteCourse={deleteCourse}
         />
@@ -263,12 +248,11 @@ export default function TrainingPortal() {
               Create AI Course
             </button>
             <button
-              onClick={handleManualCreate}
-              disabled={creatingManual}
-              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50"
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors"
             >
               <Plus className="w-4 h-4" />
-              <span className="hidden lg:inline">{creatingManual ? 'Creating...' : 'Manual'}</span>
+              <span className="hidden lg:inline">Manual</span>
             </button>
           </div>
         )}
@@ -349,7 +333,7 @@ export default function TrainingPortal() {
       {filtered.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
           <GraduationCap className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-          <p>No courses found. Try creating one using "Manual" or "Create AI Course".</p>
+          <p>No courses found. Try creating one using "+ Manual" or "Create AI Course".</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -364,7 +348,7 @@ export default function TrainingPortal() {
               >
                 {isLocked && <LockedOverlay onUpgrade={() => setShowUpgrade(true)} />}
                 <div className="w-full text-left flex-1 flex flex-col">
-                  <div
+                  <div 
                     onClick={() => !isLocked && setSelectedCourse(course)}
                     className="h-24 relative flex items-center justify-center shrink-0 cursor-pointer overflow-hidden"
                   >
@@ -390,7 +374,7 @@ export default function TrainingPortal() {
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${levelBadge[course.level] || levelBadge.beginner}`}>{course.level}</span>
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colors.bg} ${colors.text}`}>{course.category}</span>
                       </div>
-                      <h3
+                      <h3 
                         onClick={() => !isLocked && setSelectedCourse(course)}
                         className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-2 cursor-pointer"
                       >
@@ -408,8 +392,8 @@ export default function TrainingPortal() {
                             .map((module: Module) => {
                               const isModuleLocked = isStudent && !isPremium && !module.is_free_preview && course.level === 'advanced' && !enrollment;
                               return (
-                                <div
-                                  key={module.id}
+                                <div 
+                                  key={module.id} 
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (!isLocked) {
@@ -438,7 +422,7 @@ export default function TrainingPortal() {
                     </div>
 
                     <div className="flex items-center gap-3 mt-4 text-xs text-slate-400 pt-2">
-                      <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {course.duration_hours ?? ''}h</span>
+                      <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {course.duration_hours ?? '—'}h</span>
                       <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {course.instructor || 'NeuralAcademy'}</span>
                     </div>
                   </div>
@@ -457,12 +441,109 @@ export default function TrainingPortal() {
         </div>
       )}
 
+      {showCreateModal && <CreateCourseModal onClose={() => setShowCreateModal(false)} onCreate={createCourse} />}
       {showAICourseModal && (
         <CreateAICourseModal
           onClose={() => setShowAICourseModal(false)}
           onSuccess={loadData}
         />
       )}
+    </div>
+  );
+}
+
+function CreateCourseModal({ onClose, onCreate }: { onClose: () => void; onCreate: (data: Partial<Course>) => void }) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('AI Fundamentals');
+  const [level, setLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('beginner');
+  const [duration, setDuration] = useState(4);
+  const [instructor, setInstructor] = useState('');
+  const [color, setColor] = useState('blue');
+
+  const categories = ['AI Fundamentals', 'Deep Learning', 'Business AI', 'NLP', 'AI Ethics', 'Computer Vision', 'Prompt Engineering'];
+  const colors = ['blue', 'emerald', 'amber', 'rose', 'violet', 'cyan', 'orange', 'slate'];
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onCreate({
+      title,
+      description,
+      category,
+      level,
+      duration_hours: duration,
+      instructor,
+      thumbnail_color: color,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+      <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto scrollbar-thin" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-slate-100 sticky top-0 bg-white z-10">
+          <h3 className="font-bold text-slate-900">Create New Course</h3>
+          <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-lg"><X className="w-5 h-5 text-slate-500" /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Course title</label>
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="Introduction to Deep Learning"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Description</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} required placeholder="Course description..." rows={3}
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Category</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white">
+                {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Level</label>
+              <select value={level} onChange={(e) => setLevel(e.target.value as 'beginner' | 'intermediate' | 'advanced')}
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white">
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Duration (hours)</label>
+              <input type="number" value={duration} onChange={(e) => setDuration(Number(e.target.value))} min={1} required
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Instructor Name</label>
+              <input type="text" value={instructor} onChange={(e) => setInstructor(e.target.value)} placeholder="Dr. Sarah Connor"
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Accent Color</label>
+            <div className="flex gap-2">
+              {colors.map((c) => (
+                <button
+                  type="button"
+                  key={c}
+                  onClick={() => setColor(c)}
+                  className={`w-7 h-7 rounded-full transition-transform ${colorClasses[c].gradient} ${color === c ? 'ring-2 ring-offset-2 ring-blue-500 scale-110' : ''}`}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Cancel</button>
+            <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium">Create Course</button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
