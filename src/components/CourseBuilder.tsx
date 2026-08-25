@@ -7,6 +7,7 @@ import {
   Pencil, Save, X, Eye, Code2, FileText, Loader2, GripVertical,
 } from 'lucide-react';
 import type { Course, Module, Lesson } from '@/types';
+import DocumentUpload from '@/components/DocumentUpload';
 
 interface CourseBuilderProps {
   course: Course;
@@ -47,6 +48,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
   const [metaInstructor, setMetaInstructor] = useState(course.instructor ?? '');
   const [metaColor, setMetaColor] = useState(course.thumbnail_color ?? 'blue');
   const [metaImageUrl, setMetaImageUrl] = useState(course.image_url ?? '');
+  const [metaDocumentUrl, setMetaDocumentUrl] = useState((course as any).document_url ?? '');
   const [metaPrice, setMetaPrice] = useState((course as any).price ?? 0);
   const [metaIsPro, setMetaIsPro] = useState((course as any).is_pro ?? false);
   const [metaPublished, setMetaPublished] = useState<boolean>(
@@ -59,12 +61,14 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
   const [newModuleDescription, setNewModuleDescription] = useState('');
   const [newModuleFreePreview, setNewModuleFreePreview] = useState(false);
   const [newModuleImageUrl, setNewModuleImageUrl] = useState('');
+  const [newModuleDocumentUrl, setNewModuleDocumentUrl] = useState('');
 
   const [editingModuleId, setEditingModuleId] = useState<number | null>(null);
   const [editModuleTitle, setEditModuleTitle] = useState('');
   const [editModuleDescription, setEditModuleDescription] = useState('');
   const [editModuleFreePreview, setEditModuleFreePreview] = useState(false);
   const [editModuleImageUrl, setEditModuleImageUrl] = useState('');
+  const [editModuleDocumentUrl, setEditModuleDocumentUrl] = useState('');
 
   const [addingLessonForModule, setAddingLessonForModule] = useState<number | null>(null);
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
@@ -72,6 +76,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
   const [lessonType, setLessonType] = useState('text');
   const [lessonMarkdown, setLessonMarkdown] = useState('');
   const [lessonCode, setLessonCode] = useState('');
+  const [lessonDocumentUrl, setLessonDocumentUrl] = useState('');
   const [lessonPreviewMode, setLessonPreviewMode] = useState<'write' | 'preview'>('write');
   const [savingLesson, setSavingLesson] = useState(false);
 
@@ -111,6 +116,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
         category: metaCategory,
         level: metaLevel,
         image_url: metaImageUrl || null,
+        document_url: metaDocumentUrl || null,
         price: metaPrice,
         is_pro: metaIsPro,
         tier: metaIsPro ? 'pro' : 'free',
@@ -148,6 +154,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
         order_index: nextOrder,
         is_free_preview: newModuleFreePreview,
         image_url: newModuleImageUrl || null,
+        document_url: newModuleDocumentUrl || null,
       })
       .select('*')
       .single();
@@ -158,6 +165,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
       setNewModuleDescription('');
       setNewModuleFreePreview(false);
       setNewModuleImageUrl('');
+      setNewModuleDocumentUrl('');
       setAddingModule(false);
     }
   }
@@ -168,6 +176,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
     setEditModuleDescription(mod.description ?? '');
     setEditModuleFreePreview(mod.is_free_preview);
     setEditModuleImageUrl(mod.image_url ?? '');
+    setEditModuleDocumentUrl((mod as any).document_url ?? '');
   }
 
   async function saveEditModule(e: React.FormEvent) {
@@ -180,6 +189,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
         description: editModuleDescription || null,
         is_free_preview: editModuleFreePreview,
         image_url: editModuleImageUrl || null,
+        document_url: editModuleDocumentUrl || null,
       })
       .eq('id', editingModuleId);
 
@@ -187,7 +197,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
       setModules((prev) =>
         prev.map((m) =>
           m.id === editingModuleId
-            ? { ...m, title: editModuleTitle, description: editModuleDescription, is_free_preview: editModuleFreePreview, image_url: editModuleImageUrl }
+            ? { ...m, title: editModuleTitle, description: editModuleDescription, is_free_preview: editModuleFreePreview, image_url: editModuleImageUrl, document_url: editModuleDocumentUrl } as Module
             : m,
         ),
       );
@@ -223,6 +233,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
     setLessonType('text');
     setLessonMarkdown('');
     setLessonCode('');
+    setLessonDocumentUrl('');
     setLessonPreviewMode('write');
   }
 
@@ -233,6 +244,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
     setLessonType((lesson as any).lesson_type ?? 'text');
     setLessonMarkdown(lesson.content_markdown ?? '');
     setLessonCode(lesson.code_snippet ?? '');
+    setLessonDocumentUrl((lesson as any).document_url ?? '');
     setLessonPreviewMode('write');
   }
 
@@ -243,6 +255,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
     setLessonType('text');
     setLessonMarkdown('');
     setLessonCode('');
+    setLessonDocumentUrl('');
   }
 
   async function saveLesson(moduleId: number) {
@@ -258,6 +271,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
           lesson_type: lessonType,
           content_markdown: lessonMarkdown || null,
           code_snippet: lessonCode || null,
+          document_url: lessonDocumentUrl || null,
         })
         .eq('id', editingLessonId);
 
@@ -269,7 +283,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
                   ...m,
                   lessons: (m.lessons || []).map((l) =>
                     l.id === editingLessonId
-                      ? { ...l, title: lessonTitle, content_markdown: lessonMarkdown, code_snippet: lessonCode, lesson_type: lessonType } as Lesson
+                      ? { ...l, title: lessonTitle, content_markdown: lessonMarkdown, code_snippet: lessonCode, lesson_type: lessonType, document_url: lessonDocumentUrl } as Lesson
                       : l,
                   ),
                 }
@@ -287,6 +301,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
           lesson_type: lessonType,
           content_markdown: lessonMarkdown || null,
           code_snippet: lessonCode || null,
+          document_url: lessonDocumentUrl || null,
           order_index: nextOrder,
         })
         .select('*')
@@ -423,6 +438,12 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none" />
                 </div>
               </div>
+              <DocumentUpload
+                label="Attach study material (PDF, etc.)"
+                value={metaDocumentUrl}
+                onChange={setMetaDocumentUrl}
+                pathPrefix={`courses/${course.id}`}
+              />
               <div className="flex flex-wrap items-center gap-6">
                 <label className="flex items-center gap-2 text-sm text-slate-700">
                   <input type="checkbox" checked={metaIsPro} onChange={(e) => setMetaIsPro(e.target.checked)} />
@@ -482,6 +503,12 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
               <input type="checkbox" checked={newModuleFreePreview} onChange={(e) => setNewModuleFreePreview(e.target.checked)} />
               Mark as free preview module
             </label>
+            <DocumentUpload
+              label="Attach study material (PDF, etc.)"
+              value={newModuleDocumentUrl}
+              onChange={setNewModuleDocumentUrl}
+              pathPrefix={`courses/${course.id}/new-module`}
+            />
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setAddingModule(false)} className="px-3 py-1.5 text-sm text-slate-600">Cancel</button>
               <button type="submit" className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">Create module</button>
@@ -542,6 +569,12 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
                       <input type="checkbox" checked={editModuleFreePreview} onChange={(e) => setEditModuleFreePreview(e.target.checked)} />
                       Free preview module
                     </label>
+                    <DocumentUpload
+                      label="Attach study material (PDF, etc.)"
+                      value={editModuleDocumentUrl}
+                      onChange={setEditModuleDocumentUrl}
+                      pathPrefix={`courses/${course.id}/modules/${mod.id}`}
+                    />
                     <div className="flex justify-end gap-2">
                       <button type="button" onClick={() => setEditingModuleId(null)} className="px-3 py-1.5 text-sm text-slate-600">Cancel</button>
                       <button type="submit" className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">Save module</button>
@@ -574,6 +607,8 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
                             lessonType={lessonType} setLessonType={setLessonType}
                             markdown={lessonMarkdown} setMarkdown={setLessonMarkdown}
                             code={lessonCode} setCode={setLessonCode}
+                            documentUrl={lessonDocumentUrl} setDocumentUrl={setLessonDocumentUrl}
+                            documentPathPrefix={`courses/${course.id}/modules/${mod.id}/lessons/${lesson.id}`}
                             previewMode={lessonPreviewMode} setPreviewMode={setLessonPreviewMode}
                             monacoLang={monacoLang}
                             saving={savingLesson}
@@ -590,6 +625,8 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
                         lessonType={lessonType} setLessonType={setLessonType}
                         markdown={lessonMarkdown} setMarkdown={setLessonMarkdown}
                         code={lessonCode} setCode={setLessonCode}
+                        documentUrl={lessonDocumentUrl} setDocumentUrl={setLessonDocumentUrl}
+                        documentPathPrefix={`courses/${course.id}/modules/${mod.id}/lessons/new`}
                         previewMode={lessonPreviewMode} setPreviewMode={setLessonPreviewMode}
                         monacoLang={monacoLang}
                         saving={savingLesson}
@@ -632,6 +669,8 @@ interface LessonFormProps {
   lessonType: string; setLessonType: (v: string) => void;
   markdown: string; setMarkdown: (v: string) => void;
   code: string; setCode: (v: string) => void;
+  documentUrl: string; setDocumentUrl: (v: string) => void;
+  documentPathPrefix: string;
   previewMode: 'write' | 'preview'; setPreviewMode: (v: 'write' | 'preview') => void;
   monacoLang: string;
   saving: boolean;
@@ -640,7 +679,7 @@ interface LessonFormProps {
   isNew?: boolean;
 }
 
-function LessonForm({ title, setTitle, lessonType, setLessonType, markdown, setMarkdown, code, setCode, previewMode, setPreviewMode, monacoLang, saving, onCancel, onSave, isNew }: LessonFormProps) {
+function LessonForm({ title, setTitle, lessonType, setLessonType, markdown, setMarkdown, code, setCode, documentUrl, setDocumentUrl, documentPathPrefix, previewMode, setPreviewMode, monacoLang, saving, onCancel, onSave, isNew }: LessonFormProps) {
   return (
     <div className="p-4 bg-slate-50 border-t border-slate-200 space-y-4">
       <div className="flex items-center gap-2">
@@ -710,6 +749,13 @@ function LessonForm({ title, setTitle, lessonType, setLessonType, markdown, setM
           />
         </div>
       </div>
+
+      <DocumentUpload
+        label="Attach study material (PDF, etc.)"
+        value={documentUrl}
+        onChange={setDocumentUrl}
+        pathPrefix={documentPathPrefix}
+      />
 
       <div className="flex justify-end gap-2 pt-1">
         <button type="button" onClick={onCancel} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600">
