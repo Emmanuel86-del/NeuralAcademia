@@ -10,6 +10,7 @@ export default function BuyTeamSeats() {
   const [seats, setSeats] = useState(10);
   const [copied, setCopied] = useState(false);
   const [existingLicenses, setExistingLicenses] = useState<TeamLicense[]>([]);
+  const [seatsUsedMap, setSeatsUsedMap] = useState<Record<string, number>>({});
 
   useEffect(() => {
     async function loadLicenses() {
@@ -17,7 +18,25 @@ export default function BuyTeamSeats() {
         .from('company_licenses')
         .select('*')
         .order('created_at', { ascending: false });
-      if (data) setExistingLicenses(data as TeamLicense[]);
+      if (data) {
+        setExistingLicenses(data as TeamLicense[]);
+
+        const ids = data.map((l: any) => l.id);
+        if (ids.length > 0) {
+          const { data: members } = await supabase
+            .from('profiles')
+            .select('company_license_id')
+            .in('company_license_id', ids);
+
+          const counts: Record<string, number> = {};
+          (members || []).forEach((m: any) => {
+            if (m.company_license_id) {
+              counts[m.company_license_id] = (counts[m.company_license_id] || 0) + 1;
+            }
+          });
+          setSeatsUsedMap(counts);
+        }
+      }
     }
     loadLicenses();
   }, [success]);
@@ -170,27 +189,40 @@ export default function BuyTeamSeats() {
           <div className="mt-6 pt-6 border-t border-slate-700">
             <h4 className="text-sm font-semibold text-slate-300 mb-3">Your active invite codes</h4>
             <div className="space-y-2">
-              {existingLicenses.map((lic) => (
-                <div
-                  key={lic.id}
-                  className="flex items-center justify-between bg-slate-800/50 rounded-lg p-3 border border-slate-700"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-lg font-bold text-emerald-400 tracking-wider">
-                      {lic.invite_code}
-                    </span>
-                    <span className="text-xs text-slate-400">
-                      {lic.seats} seats
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => copyCode(lic.invite_code)}
-                    className="text-slate-400 hover:text-white transition-colors"
+              {existingLicenses.map((lic) => {
+                const used = seatsUsedMap[lic.id] ?? 0;
+                const pct = lic.seats > 0 ? Math.min(100, Math.round((used / lic.seats) * 100)) : 0;
+                const isFull = used >= lic.seats;
+                return (
+                  <div
+                    key={lic.id}
+                    className="bg-slate-800/50 rounded-lg p-3 border border-slate-700 space-y-2"
                   >
-                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                </div>
-              ))}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-lg font-bold text-emerald-400 tracking-wider">
+                          {lic.invite_code}
+                        </span>
+                        <span className={`text-xs ${isFull ? 'text-amber-400' : 'text-slate-400'}`}>
+                          {used} / {lic.seats} seats used
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => copyCode(lic.invite_code)}
+                        className="text-slate-400 hover:text-white transition-colors"
+                      >
+                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${isFull ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
