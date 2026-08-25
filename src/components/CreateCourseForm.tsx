@@ -6,6 +6,7 @@ import {
   ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, Save, Loader2,
   Layers, FileText, GripVertical,
 } from 'lucide-react';
+import DocumentUpload from '@/components/DocumentUpload';
 
 /**
  * ---- Local draft types -------------------------------------------------
@@ -19,6 +20,7 @@ interface DraftLesson {
   lesson_type: string;
   content_markdown: string;
   code_snippet: string;
+  document_url: string;
 }
 
 interface DraftModule {
@@ -27,6 +29,7 @@ interface DraftModule {
   description: string;
   image_url: string;
   is_free_preview: boolean;
+  document_url: string;
   lessons: DraftLesson[];
 }
 
@@ -47,15 +50,19 @@ function newKey() {
 }
 
 function emptyLesson(): DraftLesson {
-  return { key: newKey(), title: '', lesson_type: 'text', content_markdown: '', code_snippet: '' };
+  return { key: newKey(), title: '', lesson_type: 'text', content_markdown: '', code_snippet: '', document_url: '' };
 }
 
 function emptyModule(): DraftModule {
-  return { key: newKey(), title: '', description: '', image_url: '', is_free_preview: false, lessons: [emptyLesson()] };
+  return {
+    key: newKey(), title: '', description: '', image_url: '', is_free_preview: false,
+    document_url: '', lessons: [emptyLesson()],
+  };
 }
 
 export default function CreateCourseForm({ onBack, onCreated }: CreateCourseFormProps) {
   const { profile, user } = useAuth();
+  const [draftSessionId] = useState(() => newKey());
 
   // --- Course-level fields (real `courses` columns) ---
   const [title, setTitle] = useState('');
@@ -66,6 +73,11 @@ export default function CreateCourseForm({ onBack, onCreated }: CreateCourseForm
   const [isPro, setIsPro] = useState(false); // drives both is_pro and tier
   const [publishNow, setPublishNow] = useState(true); // drives is_published, published, status
   const [imageUrl, setImageUrl] = useState('');
+  const [documentUrl, setDocumentUrl] = useState('');
+
+  // Course/modules/lessons don't have DB ids yet while this form is open,
+  // so uploads go into a per-session draft folder in the bucket.
+  const draftPathPrefix = `drafts/${user?.id ?? 'anon'}/${draftSessionId}`;
 
   // --- Extra columns that require the migration in
   //     migration_add_course_columns.sql. Remove this block if you'd
@@ -183,6 +195,7 @@ export default function CreateCourseForm({ onBack, onCreated }: CreateCourseForm
           published: publishNow,
           status: publishNow ? 'published' : 'draft',
           image_url: imageUrl.trim() || null,
+          document_url: documentUrl || null,
           organization_id: (profile as any)?.organization_id ?? null,
           created_by: user.id,
           // Remove these three if you skipped the migration:
@@ -211,6 +224,7 @@ export default function CreateCourseForm({ onBack, onCreated }: CreateCourseForm
             order_index: mIdx + 1,
             is_free_preview: mod.is_free_preview,
             image_url: mod.image_url.trim() || null,
+            document_url: mod.document_url || null,
           })
           .select('*')
           .single();
@@ -227,6 +241,7 @@ export default function CreateCourseForm({ onBack, onCreated }: CreateCourseForm
             lesson_type: l.lesson_type,
             content_markdown: l.content_markdown.trim() || null,
             code_snippet: l.code_snippet.trim() || null,
+            document_url: l.document_url || null,
             order_index: lIdx + 1,
           }));
 
@@ -323,6 +338,13 @@ export default function CreateCourseForm({ onBack, onCreated }: CreateCourseForm
           </div>
         </div>
 
+        <DocumentUpload
+          label="Attach study material (PDF, etc.)"
+          value={documentUrl}
+          onChange={setDocumentUrl}
+          pathPrefix={`${draftPathPrefix}/course`}
+        />
+
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">Accent color (used when there's no cover image)</label>
           <div className="flex gap-2">
@@ -406,6 +428,12 @@ export default function CreateCourseForm({ onBack, onCreated }: CreateCourseForm
                         onChange={(e) => updateModule(mod.key, { is_free_preview: e.target.checked })} />
                       Free preview module
                     </label>
+                    <DocumentUpload
+                      label="Attach study material (PDF, etc.)"
+                      value={mod.document_url}
+                      onChange={(url) => updateModule(mod.key, { document_url: url })}
+                      pathPrefix={`${draftPathPrefix}/module-${mod.key}`}
+                    />
 
                     <div className="pt-2 border-t border-slate-100 space-y-3">
                       <div className="flex items-center justify-between">
@@ -452,6 +480,12 @@ export default function CreateCourseForm({ onBack, onCreated }: CreateCourseForm
                               />
                             </div>
                           )}
+                          <DocumentUpload
+                            label="Attach study material (PDF, etc.)"
+                            value={lesson.document_url}
+                            onChange={(url) => updateLesson(mod.key, lesson.key, { document_url: url })}
+                            pathPrefix={`${draftPathPrefix}/module-${mod.key}/lesson-${lesson.key}`}
+                          />
                         </div>
                       ))}
                     </div>
