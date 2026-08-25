@@ -22,7 +22,7 @@ export const SkillsAssessment: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
-  const [timeLeft, setTimeLeft] = useState<number>(1800);
+  const [timeLeft, setTimeLeft] = useState<number>(2500);
 
   // Form states (Teacher Create)
   const [newTitle, setNewTitle] = useState('');
