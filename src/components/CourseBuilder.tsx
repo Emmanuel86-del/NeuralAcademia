@@ -47,6 +47,11 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
   const [metaInstructor, setMetaInstructor] = useState(course.instructor ?? '');
   const [metaColor, setMetaColor] = useState(course.thumbnail_color ?? 'blue');
   const [metaImageUrl, setMetaImageUrl] = useState(course.image_url ?? '');
+  const [metaPrice, setMetaPrice] = useState((course as any).price ?? 0);
+  const [metaIsPro, setMetaIsPro] = useState((course as any).is_pro ?? false);
+  const [metaPublished, setMetaPublished] = useState<boolean>(
+    Boolean((course as any).is_published ?? (course as any).status === 'published'),
+  );
   const [savingMeta, setSavingMeta] = useState(false);
 
   const [addingModule, setAddingModule] = useState(false);
@@ -64,6 +69,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
   const [addingLessonForModule, setAddingLessonForModule] = useState<number | null>(null);
   const [editingLessonId, setEditingLessonId] = useState<number | null>(null);
   const [lessonTitle, setLessonTitle] = useState('');
+  const [lessonType, setLessonType] = useState('text');
   const [lessonMarkdown, setLessonMarkdown] = useState('');
   const [lessonCode, setLessonCode] = useState('');
   const [lessonPreviewMode, setLessonPreviewMode] = useState<'write' | 'preview'>('write');
@@ -104,17 +110,29 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
         description: metaDescription,
         category: metaCategory,
         level: metaLevel,
+        image_url: metaImageUrl || null,
+        price: metaPrice,
+        is_pro: metaIsPro,
+        tier: metaIsPro ? 'pro' : 'free',
+        is_published: metaPublished,
+        published: metaPublished,
+        status: metaPublished ? 'published' : 'draft',
+        // duration_hours / instructor / thumbnail_color only exist if you
+        // ran migration_add_course_columns.sql — remove the next 3 lines
+        // if you didn't.
         duration_hours: metaDuration,
         instructor: metaInstructor,
         thumbnail_color: metaColor,
-        image_url: metaImageUrl || null,
       })
       .eq('id', course.id);
     setSavingMeta(false);
-    if (!error) {
-      setEditingMeta(false);
-      onCourseUpdated();
+    if (error) {
+      console.error('Error saving course details:', error);
+      alert(error.message || 'Failed to save course details.');
+      return;
     }
+    setEditingMeta(false);
+    onCourseUpdated();
   }
 
   async function handleAddModule(e: React.FormEvent) {
@@ -202,6 +220,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
     setAddingLessonForModule(moduleId);
     setEditingLessonId(null);
     setLessonTitle('');
+    setLessonType('text');
     setLessonMarkdown('');
     setLessonCode('');
     setLessonPreviewMode('write');
@@ -211,6 +230,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
     setEditingLessonId(lesson.id);
     setAddingLessonForModule(null);
     setLessonTitle(lesson.title);
+    setLessonType((lesson as any).lesson_type ?? 'text');
     setLessonMarkdown(lesson.content_markdown ?? '');
     setLessonCode(lesson.code_snippet ?? '');
     setLessonPreviewMode('write');
@@ -220,6 +240,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
     setAddingLessonForModule(null);
     setEditingLessonId(null);
     setLessonTitle('');
+    setLessonType('text');
     setLessonMarkdown('');
     setLessonCode('');
   }
@@ -234,6 +255,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
         .from('lessons')
         .update({
           title: lessonTitle,
+          lesson_type: lessonType,
           content_markdown: lessonMarkdown || null,
           code_snippet: lessonCode || null,
         })
@@ -247,7 +269,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
                   ...m,
                   lessons: (m.lessons || []).map((l) =>
                     l.id === editingLessonId
-                      ? { ...l, title: lessonTitle, content_markdown: lessonMarkdown, code_snippet: lessonCode }
+                      ? { ...l, title: lessonTitle, content_markdown: lessonMarkdown, code_snippet: lessonCode, lesson_type: lessonType } as Lesson
                       : l,
                   ),
                 }
@@ -262,6 +284,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
         .insert({
           module_id: moduleId,
           title: lessonTitle,
+          lesson_type: lessonType,
           content_markdown: lessonMarkdown || null,
           code_snippet: lessonCode || null,
           order_index: nextOrder,
@@ -388,10 +411,27 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none" />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Cover image URL (optional)</label>
-                <input value={metaImageUrl} onChange={(e) => setMetaImageUrl(e.target.value)} placeholder="https://..."
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none" />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Price</label>
+                  <input type="number" min={0} step="0.01" value={metaPrice} onChange={(e) => setMetaPrice(Number(e.target.value))}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Cover image URL (optional)</label>
+                  <input value={metaImageUrl} onChange={(e) => setMetaImageUrl(e.target.value)} placeholder="https://..."
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none" />
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-6">
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input type="checkbox" checked={metaIsPro} onChange={(e) => setMetaIsPro(e.target.checked)} />
+                  Requires Pro subscription
+                </label>
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input type="checkbox" checked={metaPublished} onChange={(e) => setMetaPublished(e.target.checked)} />
+                  Published
+                </label>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Accent color</label>
@@ -531,6 +571,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
                         {editingLessonId === lesson.id && (
                           <LessonForm
                             title={lessonTitle} setTitle={setLessonTitle}
+                            lessonType={lessonType} setLessonType={setLessonType}
                             markdown={lessonMarkdown} setMarkdown={setLessonMarkdown}
                             code={lessonCode} setCode={setLessonCode}
                             previewMode={lessonPreviewMode} setPreviewMode={setLessonPreviewMode}
@@ -546,6 +587,7 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
                     {addingLessonForModule === mod.id ? (
                       <LessonForm
                         title={lessonTitle} setTitle={setLessonTitle}
+                        lessonType={lessonType} setLessonType={setLessonType}
                         markdown={lessonMarkdown} setMarkdown={setLessonMarkdown}
                         code={lessonCode} setCode={setLessonCode}
                         previewMode={lessonPreviewMode} setPreviewMode={setLessonPreviewMode}
@@ -583,8 +625,11 @@ export default function CourseBuilder({ course, onBack, onCourseUpdated, onDelet
   );
 }
 
+const LESSON_TYPES = ['text', 'video', 'code', 'quiz'];
+
 interface LessonFormProps {
   title: string; setTitle: (v: string) => void;
+  lessonType: string; setLessonType: (v: string) => void;
   markdown: string; setMarkdown: (v: string) => void;
   code: string; setCode: (v: string) => void;
   previewMode: 'write' | 'preview'; setPreviewMode: (v: 'write' | 'preview') => void;
@@ -595,16 +640,25 @@ interface LessonFormProps {
   isNew?: boolean;
 }
 
-function LessonForm({ title, setTitle, markdown, setMarkdown, code, setCode, previewMode, setPreviewMode, monacoLang, saving, onCancel, onSave, isNew }: LessonFormProps) {
+function LessonForm({ title, setTitle, lessonType, setLessonType, markdown, setMarkdown, code, setCode, previewMode, setPreviewMode, monacoLang, saving, onCancel, onSave, isNew }: LessonFormProps) {
   return (
     <div className="p-4 bg-slate-50 border-t border-slate-200 space-y-4">
-      <input
-        required
-        placeholder="Lesson title"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        className="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-200 outline-none bg-white"
-      />
+      <div className="flex items-center gap-2">
+        <input
+          required
+          placeholder="Lesson title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="flex-1 px-3.5 py-2 text-sm rounded-lg border border-slate-200 outline-none bg-white"
+        />
+        <select
+          value={lessonType}
+          onChange={(e) => setLessonType(e.target.value)}
+          className="px-3 py-2 text-sm rounded-lg border border-slate-200 outline-none bg-white"
+        >
+          {LESSON_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </div>
 
       <div>
         <div className="flex items-center justify-between mb-2">
