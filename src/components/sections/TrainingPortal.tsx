@@ -9,6 +9,7 @@ import PremiumUpgrade, { PremiumBadge, LockedOverlay } from '@/components/Premiu
 import BuyTeamSeats from '@/components/BuyTeamSeats';
 import CourseLMS from '@/components/CourseLMS';
 import CreateAICourseModal from '@/components/CreateAICourseModal';
+import CreateCourseForm from '@/components/CreateCourseForm';
 
 const colorClasses: Record<string, { gradient: string; bg: string; text: string }> = {
   blue: { gradient: 'from-blue-500 to-blue-600', bg: 'bg-blue-50', text: 'text-blue-600' },
@@ -102,7 +103,7 @@ export default function TrainingPortal() {
   const [selectedModuleId, setSelectedModuleId] = useState<number | null>(null);
   const [showAICourseModal, setShowAICourseModal] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const [creatingManual, setCreatingManual] = useState(false);
+  const [showManualCreate, setShowManualCreate] = useState(false);
 
   const isPremium = profile?.is_premium ?? false;
   const categories = ['all', ...Array.from(new Set(courses.map((c) => c.category)))];
@@ -172,46 +173,31 @@ export default function TrainingPortal() {
     setSelectedCourse(null);
   }
 
-  // Creates a bare course row the instant "Manual" is clicked, then drops the
-  // educator straight into the full-page CourseBuilder to fill in everything
-  // (details, modules, lessons) in one continuous flow — no separate popup.
-  async function handleManualCreate() {
-    if (!user || creatingManual) return;
-    setCreatingManual(true);
-
-    const { data, error } = await supabase
-      .from('courses')
-      .insert({
-        title: 'Untitled Course',
-        description: '',
-        category: 'AI Fundamentals',
-        level: 'beginner',
-        duration_hours: 1,
-        instructor: profile?.full_name || 'Instructor',
-        thumbnail_color: 'blue',
-        is_published: true,
-        created_by: user.id,
-      })
-      .select('*')
-      .single();
-
-    setCreatingManual(false);
-
-    if (error) {
-      console.error('Error creating course:', error);
-      alert('Failed to create course. Please try again.');
-      return;
-    }
-
+  // "Manual" now opens a full page (CreateCourseForm) that captures every
+  // real courses/modules/lessons column up front, instead of inserting a
+  // bare placeholder row (which was failing — see CreateCourseForm.tsx
+  // notes for why). Once the course + its modules/lessons are created,
+  // we drop the educator into CourseBuilder for any further edits.
+  async function handleCourseCreated(courseId: number) {
+    setShowManualCreate(false);
+    await loadData();
+    const { data } = await supabase.from('courses').select('*').eq('id', courseId).maybeSingle();
     if (data) {
-      const created = data as unknown as Course;
-      setCourses((prev) => [created, ...prev]);
-      setSelectedCourse(created);
+      setSelectedCourse(data as unknown as Course);
     }
   }
 
   if (loading) {
     return <div className="flex items-center justify-center h-64 text-slate-400">Loading courses...</div>;
+  }
+
+  if (showManualCreate && isEducator) {
+    return (
+      <CreateCourseForm
+        onBack={() => setShowManualCreate(false)}
+        onCreated={handleCourseCreated}
+      />
+    );
   }
 
   if (selectedCourse) {
@@ -263,12 +249,11 @@ export default function TrainingPortal() {
               Create AI Course
             </button>
             <button
-              onClick={handleManualCreate}
-              disabled={creatingManual}
-              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors disabled:opacity-50"
+              onClick={() => setShowManualCreate(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors"
             >
               <Plus className="w-4 h-4" />
-              <span className="hidden lg:inline">{creatingManual ? 'Creating...' : 'Manual'}</span>
+              <span className="hidden lg:inline">Manual</span>
             </button>
           </div>
         )}
