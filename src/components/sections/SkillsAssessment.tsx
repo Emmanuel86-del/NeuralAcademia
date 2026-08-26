@@ -243,7 +243,10 @@ export const SkillsAssessment: React.FC = () => {
     }
   };
 
- const handleDownloadExamFile = (exam: any) => {
+  const handleDownloadExamFile = async (exam: any) => {
+    // Import html2pdf dynamically to prevent SSR issues
+    const html2pdf = (await import('html2pdf.js')).default;
+
     // Fallback or dynamic course theme extracted from the exam
     const theme = exam.color_theme || {
       primary: '#4f46e5', // Indigo primary
@@ -268,144 +271,52 @@ export const SkillsAssessment: React.FC = () => {
     const formattedDescription = escapeHtml(exam.description);
     const formattedQuestions = escapeHtml(exam.questions || 'No questions body provided.');
 
-    // Create a hidden iframe to render and trigger PDF printing
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow?.document;
-    if (!doc) return;
-
-    doc.open();
-    doc.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>${exam.title}</title>
-        <style>
-          :root {
-            --theme-primary: ${theme.primary};
-            --theme-primary-light: ${theme.primaryLight};
-            --theme-text: ${theme.textMain};
-            --theme-bg: ${theme.background};
-            --theme-card: ${theme.cardBg};
-            --theme-border: ${theme.border};
-          }
-          body { 
-            font-family: system-ui, -apple-system, sans-serif; 
-            margin: 0; 
-            padding: 40px; 
-            color: var(--theme-text); 
-            line-height: 1.6; 
-            background: var(--theme-bg); 
-          }
-          h1 { 
-            color: var(--theme-primary); 
-            border-bottom: 2px solid var(--theme-primary-light); 
-            padding-bottom: 12px; 
-            margin-top: 10px; 
-            font-size: 24px;
-          }
-          .badge { 
-            background: var(--theme-primary-light); 
-            color: var(--theme-primary); 
-            padding: 6px 12px; 
-            border-radius: 6px; 
-            font-size: 11px; 
-            font-weight: bold; 
-            display: inline-block; 
-            letter-spacing: 0.05em; 
-          }
-          .meta-info {
-            display: flex;
-            gap: 20px;
-            margin-top: 15px;
-            font-size: 13px;
-            color: #64748b;
-            font-weight: 500;
-          }
-          .section { 
-            background: var(--theme-card); 
-            border: 1px solid var(--theme-border); 
-            padding: 24px; 
-            border-radius: 12px; 
-            margin-top: 20px; 
-          }
-          h3 { 
-            margin-top: 0; 
-            color: var(--theme-primary); 
-            font-size: 12px; 
-            text-transform: uppercase; 
-            letter-spacing: 0.08em; 
-            border-bottom: 1px solid #f1f5f9; 
-            padding-bottom: 8px; 
-          }
-          .content-box { 
-            font-family: system-ui, -apple-system, sans-serif;
-            font-size: 13px; 
-            color: #0f172a; 
-            line-height: 1.7;
-            word-break: break-word;
-          }
-          .footer { 
-            margin-top: 40px; 
-            text-align: center; 
-            font-size: 11px; 
-            color: #64748b; 
-            border-top: 1px solid #e2e8f0; 
-            padding-top: 15px; 
-          }
-          @media print {
-            body { padding: 20px; }
-            .section { break-inside: avoid; border: 1px solid #94a3b8; }
-          }
-        </style>
-      </head>
-      <body>
-        <span class="badge">NEURAL ACADEMY OFFICIAL ASSESSMENT</span>
-        <h1>${exam.title}</h1>
+    // Create a temporary container element to hold the styled exam document
+    const element = document.createElement('div');
+    element.innerHTML = `
+      <div style="font-family: system-ui, -apple-system, sans-serif; padding: 30px; color: ${theme.textMain}; background: ${theme.background}; line-height: 1.6;">
+        <div style="background: ${theme.primaryLight}; color: ${theme.primary}; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: bold; display: inline-block; letter-spacing: 0.05em; margin-bottom: 10px;">
+          NEURAL ACADEMY OFFICIAL ASSESSMENT
+        </div>
+        <h1 style="color: ${theme.primary}; border-bottom: 2px solid ${theme.primaryLight}; padding-bottom: 12px; margin-top: 0; font-size: 22px;">
+          ${exam.title}
+        </h1>
         
-        <div class="meta-info">
+        <div style="display: flex; gap: 20px; margin-top: 15px; font-size: 12px; color: #64748b; font-weight: 500;">
           <span>⏱ Duration: ${exam.timer_enabled !== false ? `${exam.duration_mins || 30} minutes` : 'Untimed'}</span>
           <span>📁 Ref: ${exam.pdf_url || 'N/A'}</span>
         </div>
 
         ${formattedDescription ? `
-        <div class="section">
-          <h3>Instructions & Overview</h3>
-          <div class="content-box">${formattedDescription}</div>
+        <div style="background: ${theme.cardBg}; border: 1px solid ${theme.border}; padding: 20px; border-radius: 10px; margin-top: 20px;">
+          <h3 style="margin-top: 0; color: ${theme.primary}; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px;">Instructions & Overview</h3>
+          <div style="font-size: 13px; color: #0f172a;">${formattedDescription}</div>
         </div>` : ''}
 
-        <div class="section">
-          <h3>Exam Questions & Tasks</h3>
-          <div class="content-box">${formattedQuestions}</div>
+        <div style="background: ${theme.cardBg}; border: 1px solid ${theme.border}; padding: 20px; border-radius: 10px; margin-top: 20px;">
+          <h3 style="margin-top: 0; color: ${theme.primary}; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px;">Exam Questions & Tasks</h3>
+          <div style="font-size: 13px; color: #0f172a; word-break: break-word;">${formattedQuestions}</div>
         </div>
 
-        <div class="footer">
+        <div style="margin-top: 30px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 15px;">
           Neural Academy Learning Management System &bull; Official Student Copy
         </div>
-      </body>
-      </html>
-    `);
-    doc.close();
+      </div>
+    `;
 
-    // Wait for frame to load then invoke print dialog configured for PDF saving
-    setTimeout(() => {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
-      // Clean up iframe after print dialog closes
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-      }, 1000);
-    }, 500);
+    // Configure PDF options
+    const opt = {
+      margin:       10,
+      filename:     `${exam.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_exam.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
 
-    triggerToast(`Opening PDF save dialog with course color theme...`);
+    // Trigger direct download to PC
+    html2pdf().from(element).set(opt).save().then(() => {
+      triggerToast(`Exam PDF downloaded successfully to your computer!`);
+    });
   };
 
   const getSubmissionForExam = (examId: string) => {
