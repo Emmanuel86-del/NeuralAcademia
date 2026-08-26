@@ -243,27 +243,46 @@ export const SkillsAssessment: React.FC = () => {
     }
   };
 
-  const handleDownloadExamFile = (exam: any) => {
+ const handleDownloadExamFile = (exam: any) => {
     // Fallback or dynamic course theme extracted from the exam
     const theme = exam.color_theme || {
       primary: '#4f46e5', // Indigo primary
       primaryLight: '#e0e7ff',
       textMain: '#1e293b',
-      background: '#fdfdfd',
+      background: '#ffffff',
       cardBg: '#ffffff',
       border: '#cbd5e1'
     };
 
-    // Format description and questions safely into HTML blocks
-    const formattedDescription = exam.description 
-      ? exam.description.replace(/\n/g, '<br/>') 
-      : '';
-      
-    const formattedQuestions = exam.questions 
-      ? exam.questions.replace(/\n/g, '<br/>') 
-      : 'No questions body provided.';
+    const escapeHtml = (str: string) => {
+      if (!str) return '';
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+        .replace(/\n/g, '<br/>');
+    };
 
-    const htmlContent = `
+    const formattedDescription = escapeHtml(exam.description);
+    const formattedQuestions = escapeHtml(exam.questions || 'No questions body provided.');
+
+    // Create a hidden iframe to render and trigger PDF printing
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) return;
+
+    doc.open();
+    doc.write(`
       <!DOCTYPE html>
       <html>
       <head>
@@ -280,9 +299,8 @@ export const SkillsAssessment: React.FC = () => {
           }
           body { 
             font-family: system-ui, -apple-system, sans-serif; 
-            max-width: 850px; 
-            margin: 40px auto; 
-            padding: 30px; 
+            margin: 0; 
+            padding: 40px; 
             color: var(--theme-text); 
             line-height: 1.6; 
             background: var(--theme-bg); 
@@ -292,13 +310,14 @@ export const SkillsAssessment: React.FC = () => {
             border-bottom: 2px solid var(--theme-primary-light); 
             padding-bottom: 12px; 
             margin-top: 10px; 
+            font-size: 24px;
           }
           .badge { 
             background: var(--theme-primary-light); 
             color: var(--theme-primary); 
             padding: 6px 12px; 
             border-radius: 6px; 
-            font-size: 12px; 
+            font-size: 11px; 
             font-weight: bold; 
             display: inline-block; 
             letter-spacing: 0.05em; 
@@ -314,15 +333,14 @@ export const SkillsAssessment: React.FC = () => {
           .section { 
             background: var(--theme-card); 
             border: 1px solid var(--theme-border); 
-            padding: 30px; 
+            padding: 24px; 
             border-radius: 12px; 
-            margin-top: 25px; 
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05); 
+            margin-top: 20px; 
           }
           h3 { 
             margin-top: 0; 
             color: var(--theme-primary); 
-            font-size: 13px; 
+            font-size: 12px; 
             text-transform: uppercase; 
             letter-spacing: 0.08em; 
             border-bottom: 1px solid #f1f5f9; 
@@ -330,17 +348,22 @@ export const SkillsAssessment: React.FC = () => {
           }
           .content-box { 
             font-family: system-ui, -apple-system, sans-serif;
-            font-size: 14px; 
+            font-size: 13px; 
             color: #0f172a; 
             line-height: 1.7;
+            word-break: break-word;
           }
           .footer { 
             margin-top: 40px; 
             text-align: center; 
-            font-size: 12px; 
+            font-size: 11px; 
             color: #64748b; 
             border-top: 1px solid #e2e8f0; 
             padding-top: 15px; 
+          }
+          @media print {
+            body { padding: 20px; }
+            .section { break-inside: avoid; border: 1px solid #94a3b8; }
           }
         </style>
       </head>
@@ -365,23 +388,24 @@ export const SkillsAssessment: React.FC = () => {
         </div>
 
         <div class="footer">
-          Neural Academy Learning Management System &bull; Generated Official Copy
+          Neural Academy Learning Management System &bull; Official Student Copy
         </div>
       </body>
       </html>
-    `;
+    `);
+    doc.close();
 
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${exam.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_exam.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Wait for frame to load then invoke print dialog configured for PDF saving
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      // Clean up iframe after print dialog closes
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+    }, 500);
 
-    triggerToast(`Complete exam downloaded cleanly with color theme!`);
+    triggerToast(`Opening PDF save dialog with course color theme...`);
   };
 
   const getSubmissionForExam = (examId: string) => {
