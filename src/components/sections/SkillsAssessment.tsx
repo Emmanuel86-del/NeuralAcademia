@@ -244,10 +244,20 @@ export const SkillsAssessment: React.FC = () => {
     }
   };
 
-  const handleDownloadExamFile = (exam: any) => {
+ const handleDownloadExamFile = (exam: any) => {
+    // Fallback or dynamic course theme extracted from the exam or default to Neural Academy indigo theme
+    const theme = exam.color_theme || {
+      primary: '#4f46e5', // Indigo primary
+      primaryLight: '#e0e7ff',
+      textMain: '#1e293b',
+      background: '#fdfdfd',
+      cardBg: '#ffffff',
+      border: '#cbd5e1'
+    };
+
     const fullExamContent = [
       exam.description ? `INSTRUCTIONS & OVERVIEW:\n${exam.description}\n` : '',
-      exam.questions ? `QUESTIONS:\n${exam.questions}` : 'No questions body provided.'
+      exam.questions ? `QUESTIONS & TASKS:\n${exam.questions}` : 'No questions body provided.'
     ].filter(Boolean).join('\n\n');
 
     const htmlContent = `
@@ -256,21 +266,95 @@ export const SkillsAssessment: React.FC = () => {
       <head>
         <title>${exam.title}</title>
         <style>
-          body { font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 40px auto; padding: 30px; color: #1e293b; line-height: 1.6; background: #fdfdfd; }
-          h1 { color: #4f46e5; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-top: 10px; }
-          .badge { background: #e0e7ff; color: #4338ca; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; display: inline-block; letter-spacing: 0.05em; }
-          .section { background: #ffffff; border: 1px solid #cbd5e1; padding: 25px; border-radius: 12px; margin-top: 25px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05); }
-          h3 { margin-top: 0; color: #334155; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; }
-          pre { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 14px; background: #f8fafc; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; color: #0f172a; }
-          .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+          :root {
+            --theme-primary: ${theme.primary};
+            --theme-primary-light: ${theme.primaryLight};
+            --theme-text: ${theme.textMain};
+            --theme-bg: ${theme.background};
+            --theme-card: ${theme.cardBg};
+            --theme-border: ${theme.border};
+          }
+          body { 
+            font-family: system-ui, -apple-system, sans-serif; 
+            max-width: 850px; 
+            margin: 40px auto; 
+            padding: 30px; 
+            color: var(--theme-text); 
+            line-height: 1.6; 
+            background: var(--theme-bg); 
+          }
+          h1 { 
+            color: var(--theme-primary); 
+            border-bottom: 2px solid var(--theme-primary-light); 
+            padding-bottom: 12px; 
+            margin-top: 10px; 
+          }
+          .badge { 
+            background: var(--theme-primary-light); 
+            color: var(--theme-primary); 
+            padding: 6px 12px; 
+            border-radius: 6px; 
+            font-size: 12px; 
+            font-weight: bold; 
+            display: inline-block; 
+            letter-spacing: 0.05em; 
+          }
+          .meta-info {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+            font-size: 13px;
+            color: #64748b;
+            font-weight: 500;
+          }
+          .section { 
+            background: var(--theme-card); 
+            border: 1px solid var(--theme-border); 
+            padding: 25px; 
+            border-radius: 12px; 
+            margin-top: 25px; 
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05); 
+          }
+          h3 { 
+            margin-top: 0; 
+            color: var(--theme-text); 
+            font-size: 13px; 
+            text-transform: uppercase; 
+            letter-spacing: 0.08em; 
+            border-bottom: 1px solid #f1f5f9; 
+            padding-bottom: 8px; 
+          }
+          pre { 
+            white-space: pre-wrap; 
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; 
+            font-size: 14px; 
+            background: #f8fafc; 
+            padding: 20px; 
+            border-radius: 8px; 
+            border: 1px solid #e2e8f0; 
+            color: #0f172a; 
+          }
+          .footer { 
+            margin-top: 40px; 
+            text-align: center; 
+            font-size: 12px; 
+            color: #64748b; 
+            border-top: 1px solid #e2e8f0; 
+            padding-top: 15px; 
+          }
         </style>
       </head>
       <body>
         <span class="badge">NEURAL ACADEMY OFFICIAL ASSESSMENT</span>
         <h1>${exam.title}</h1>
         
+        <div class="meta-info">
+          <span>⏱ Duration: ${exam.timer_enabled !== false ? `${exam.duration_mins || 30} minutes` : 'Untimed'}</span>
+          <span>📁 Document Ref: ${exam.pdf_url || 'N/A'}</span>
+        </div>
+
         <div class="section">
-          <h3>Full Assessment Document</h3>
+          <h3>Complete Assessment Content & Instructions</h3>
           <pre>${fullExamContent}</pre>
         </div>
 
@@ -291,7 +375,7 @@ export const SkillsAssessment: React.FC = () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    triggerToast(`Complete exam file downloaded successfully!`);
+    triggerToast(`Complete exam file with course color theme downloaded successfully!`);
   };
 
   const getSubmissionForExam = (examId: string) => {
