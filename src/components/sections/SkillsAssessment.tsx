@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+lets solve the last issue of the project, in skill assessement when a student downloads an exam to do it elsewhere then submit it doesnot download everything on the exam, i want it to be downloaded well and to include the colour theme that has been chosen by the teacher on that particular course. here is the code for skill assessment..import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X, Plus, FileText, Upload, Clock, Award, BookOpen, CheckCircle2, ArrowRight, Search, Filter, Bold, Italic, Code, CheckCircle, AlertCircle, Paperclip, ToggleLeft, ToggleRight, Trash2, Download, Terminal } from 'lucide-react';
 
@@ -244,7 +244,7 @@ export const SkillsAssessment: React.FC = () => {
     }
   };
 
-const handleDownloadExamFile = (exam: any) => {
+  const handleDownloadExamFile = (exam: any) => {
     // Fallback or dynamic course theme extracted from the exam
     const theme = exam.color_theme || {
       primary: '#4f46e5', // Indigo primary
@@ -384,6 +384,30 @@ const handleDownloadExamFile = (exam: any) => {
 
     triggerToast(`Complete exam downloaded cleanly with color theme!`);
   };
+
+  const getSubmissionForExam = (examId: string) => {
+    return submissions.find(s => s.exam_id === examId);
+  };
+
+  const insertFormatting = (wrapper: string) => {
+    setStudentTextAnswer(prev => prev + wrapper);
+  };
+
+  const insertCodeSnippet = (type: string) => {
+    let snippet = '';
+    if (type === 'html') {
+      snippet = '<!DOCTYPE html>\n<html>\n<head>\n    <title>Page Title</title>\n</head>\n<body>\n    <!-- Write code here -->\n</body>\n</html>';
+    } else if (type === 'css') {
+      snippet = 'selector {\n    property: value;\n}';
+    } else if (type === 'js') {
+      snippet = 'function solution() {\n    // Write your code here\n}';
+    } else if (type === 'sql') {
+      snippet = 'SELECT column_name\nFROM table_name\nWHERE condition;';
+    }
+    setStudentTextAnswer(prev => prev + (prev ? '\n\n' : '') + snippet);
+    triggerToast(`Inserted ${type.toUpperCase()} snippet template!`, 'info');
+  };
+
   const filteredExams = exams.filter(exam => {
     const sub = getSubmissionForExam(exam.id);
     const isSubmitted = !!sub;
