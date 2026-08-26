@@ -244,8 +244,8 @@ export const SkillsAssessment: React.FC = () => {
     }
   };
 
- const handleDownloadExamFile = (exam: any) => {
-    // Fallback or dynamic course theme extracted from the exam or default to Neural Academy indigo theme
+const handleDownloadExamFile = (exam: any) => {
+    // Fallback or dynamic course theme extracted from the exam
     const theme = exam.color_theme || {
       primary: '#4f46e5', // Indigo primary
       primaryLight: '#e0e7ff',
@@ -255,15 +255,20 @@ export const SkillsAssessment: React.FC = () => {
       border: '#cbd5e1'
     };
 
-    const fullExamContent = [
-      exam.description ? `INSTRUCTIONS & OVERVIEW:\n${exam.description}\n` : '',
-      exam.questions ? `QUESTIONS & TASKS:\n${exam.questions}` : 'No questions body provided.'
-    ].filter(Boolean).join('\n\n');
+    // Format description and questions safely into HTML blocks
+    const formattedDescription = exam.description 
+      ? exam.description.replace(/\n/g, '<br/>') 
+      : '';
+      
+    const formattedQuestions = exam.questions 
+      ? exam.questions.replace(/\n/g, '<br/>') 
+      : 'No questions body provided.';
 
     const htmlContent = `
       <!DOCTYPE html>
       <html>
       <head>
+        <meta charset="UTF-8">
         <title>${exam.title}</title>
         <style>
           :root {
@@ -310,29 +315,25 @@ export const SkillsAssessment: React.FC = () => {
           .section { 
             background: var(--theme-card); 
             border: 1px solid var(--theme-border); 
-            padding: 25px; 
+            padding: 30px; 
             border-radius: 12px; 
             margin-top: 25px; 
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05); 
           }
           h3 { 
             margin-top: 0; 
-            color: var(--theme-text); 
+            color: var(--theme-primary); 
             font-size: 13px; 
             text-transform: uppercase; 
             letter-spacing: 0.08em; 
             border-bottom: 1px solid #f1f5f9; 
             padding-bottom: 8px; 
           }
-          pre { 
-            white-space: pre-wrap; 
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; 
+          .content-box { 
+            font-family: system-ui, -apple-system, sans-serif;
             font-size: 14px; 
-            background: #f8fafc; 
-            padding: 20px; 
-            border-radius: 8px; 
-            border: 1px solid #e2e8f0; 
             color: #0f172a; 
+            line-height: 1.7;
           }
           .footer { 
             margin-top: 40px; 
@@ -350,12 +351,18 @@ export const SkillsAssessment: React.FC = () => {
         
         <div class="meta-info">
           <span>⏱ Duration: ${exam.timer_enabled !== false ? `${exam.duration_mins || 30} minutes` : 'Untimed'}</span>
-          <span>📁 Document Ref: ${exam.pdf_url || 'N/A'}</span>
+          <span>📁 Ref: ${exam.pdf_url || 'N/A'}</span>
         </div>
 
+        ${formattedDescription ? `
         <div class="section">
-          <h3>Complete Assessment Content & Instructions</h3>
-          <pre>${fullExamContent}</pre>
+          <h3>Instructions & Overview</h3>
+          <div class="content-box">${formattedDescription}</div>
+        </div>` : ''}
+
+        <div class="section">
+          <h3>Exam Questions & Tasks</h3>
+          <div class="content-box">${formattedQuestions}</div>
         </div>
 
         <div class="footer">
@@ -365,7 +372,7 @@ export const SkillsAssessment: React.FC = () => {
       </html>
     `;
 
-    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -375,32 +382,8 @@ export const SkillsAssessment: React.FC = () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    triggerToast(`Complete exam file with course color theme downloaded successfully!`);
+    triggerToast(`Complete exam downloaded cleanly with color theme!`);
   };
-
-  const getSubmissionForExam = (examId: string) => {
-    return submissions.find(s => s.exam_id === examId);
-  };
-
-  const insertFormatting = (wrapper: string) => {
-    setStudentTextAnswer(prev => prev + wrapper);
-  };
-
-  const insertCodeSnippet = (type: string) => {
-    let snippet = '';
-    if (type === 'html') {
-      snippet = '<!DOCTYPE html>\n<html>\n<head>\n    <title>Page Title</title>\n</head>\n<body>\n    <!-- Write code here -->\n</body>\n</html>';
-    } else if (type === 'css') {
-      snippet = 'selector {\n    property: value;\n}';
-    } else if (type === 'js') {
-      snippet = 'function solution() {\n    // Write your code here\n}';
-    } else if (type === 'sql') {
-      snippet = 'SELECT column_name\nFROM table_name\nWHERE condition;';
-    }
-    setStudentTextAnswer(prev => prev + (prev ? '\n\n' : '') + snippet);
-    triggerToast(`Inserted ${type.toUpperCase()} snippet template!`, 'info');
-  };
-
   const filteredExams = exams.filter(exam => {
     const sub = getSubmissionForExam(exam.id);
     const isSubmitted = !!sub;
