@@ -38,13 +38,15 @@ export default function Overview({ onNavigate }: OverviewProps) {
       const userId = profile.id;
 
       // Fetch platform settings toggle state from Supabase
-      const { data: settingsData } = await supabase
+      const { data: settingsData, error: settingsError } = await supabase
         .from('platform_settings')
         .select('ai_tutor_enabled')
         .eq('id', 'global_config')
-        .single();
+        .maybeSingle();
 
-      if (settingsData && typeof settingsData.ai_tutor_enabled === 'boolean') {
+      if (settingsError) {
+        console.error('Error loading AI switch status:', settingsError.message);
+      } else if (settingsData && typeof settingsData.ai_tutor_enabled === 'boolean') {
         setAiEnabled(settingsData.ai_tutor_enabled);
       }
 
@@ -86,15 +88,22 @@ export default function Overview({ onNavigate }: OverviewProps) {
     loadData();
   }, [profile, isTeacher, isAdmin]);
 
-  // Handler to update database when the switch is toggled
+  // Handler to update database when the switch is toggled.
+  // Uses upsert instead of update: if the `global_config` row doesn't
+  // exist yet, a plain update() matches zero rows and silently no-ops —
+  // which was the actual bug (the toggle looked like it worked because
+  // the local state flipped, but nothing was ever written to the DB, so
+  // every other page kept reading the old/default value).
   const handleToggleAi = async () => {
     const newState = !aiEnabled;
     setAiEnabled(newState); // Optimistic UI update
 
     const { error } = await supabase
       .from('platform_settings')
-      .update({ ai_tutor_enabled: newState, updated_at: new Date().toISOString() })
-      .eq('id', 'global_config');
+      .upsert(
+        { id: 'global_config', ai_tutor_enabled: newState, updated_at: new Date().toISOString() },
+        { onConflict: 'id' }
+      );
 
     if (error) {
       console.error('Error updating AI switch status:', error.message);
