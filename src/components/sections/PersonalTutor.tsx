@@ -44,11 +44,20 @@ export default function PersonalTutor() {
   }, [user]);
 
   async function checkAiSwitch() {
-    const { data } = await supabase
+    // maybeSingle (not single) so a missing row doesn't throw — and we
+    // actually log the error instead of swallowing it, so a misconfigured
+    // table/RLS policy is visible in the console instead of silently
+    // leaving the switch stuck at its default (true/"on").
+    const { data, error } = await supabase
       .from('platform_settings')
       .select('ai_tutor_enabled')
       .eq('id', 'global_config')
-      .single();
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error checking AI tutor switch:', error.message);
+      return;
+    }
 
     if (data && typeof data.ai_tutor_enabled === 'boolean') {
       setAiEnabled(data.ai_tutor_enabled);
@@ -90,7 +99,7 @@ export default function PersonalTutor() {
       content: "Hello! I'm your AI Personal Tutor. What would you like to explore today?",
       timestamp: new Date().toISOString(),
     };
-    
+
     const { data, error } = await supabase
       .from('tutor_sessions')
       .insert({
@@ -182,13 +191,13 @@ export default function PersonalTutor() {
 
   async function startWithTopic(topicPrompt: string, topicName: string) {
     if (!aiEnabled || !user) return;
-    
+
     const welcomeMsg: TutorMessage = {
       role: 'tutor',
       content: "Hello! I'm your AI Personal Tutor. What would you like to explore today?",
       timestamp: new Date().toISOString(),
     };
-    
+
     const userMsg: TutorMessage = {
       role: 'user',
       content: topicPrompt,
