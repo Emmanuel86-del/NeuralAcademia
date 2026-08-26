@@ -1,4 +1,3 @@
-lets solve the last issue of the project, in skill assessement when a student downloads an exam to do it elsewhere then submit it doesnot download everything on the exam, i want it to be downloaded well and to include the colour theme that has been chosen by the teacher on that particular course. here is the code for skill assessment..import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X, Plus, FileText, Upload, Clock, Award, BookOpen, CheckCircle2, ArrowRight, Search, Filter, Bold, Italic, Code, CheckCircle, AlertCircle, Paperclip, ToggleLeft, ToggleRight, Trash2, Download, Terminal } from 'lucide-react';
 
