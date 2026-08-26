@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X, Plus, FileText, Upload, Clock, Award, BookOpen, CheckCircle2, ArrowRight, Search, Filter, Bold, Italic, Code, CheckCircle, AlertCircle, Paperclip, ToggleLeft, ToggleRight, Trash2, Download, Terminal } from 'lucide-react';
 
@@ -13,7 +14,6 @@ export const SkillsAssessment: React.FC = () => {
   const [showTakeExamModal, setShowTakeExamModal] = useState(false);
   const [showResultsModal, setShowResultsModal] = useState(false);
   const [showGradingModal, setShowGradingModal] = useState(false);
-  
   const [selectedExam, setSelectedExam] = useState<any | null>(null);
   const [selectedSubmission, setSelectedSubmission] = useState<any | null>(null);
   
