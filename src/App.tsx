@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StudentDashboard } from '@/components/StudentDashboard';
 import { AlertCircle, Lock, ShieldAlert } from 'lucide-react';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
@@ -11,6 +11,17 @@ import SkillsAssessment from '@/components/sections/SkillsAssessment';
 import LanguageCoach from '@/components/sections/LanguageCoach';
 
 type ExtendedSection = DashboardSection | 'student-dashboard';
+
+const SECTIONS: ExtendedSection[] = ['overview', 'tutor', 'training', 'assessment', 'language', 'student-dashboard'];
+
+// Reads the current section out of the URL hash (e.g. "#/training" -> "training").
+// Falls back to 'overview' for anything unrecognized, which safely covers the
+// empty hash on first load and also a Supabase auth hash like
+// "#access_token=...&type=recovery" (it just won't match any known section).
+function sectionFromHash(): ExtendedSection {
+  const raw = window.location.hash.replace(/^#\/?/, '');
+  return (SECTIONS as string[]).includes(raw) ? (raw as ExtendedSection) : 'overview';
+}
 
 function PasswordRecoveryModal() {
   const { updatePassword, signOut } = useAuth();
@@ -133,14 +144,48 @@ function PasswordRecoveryModal() {
 }
 
 function Dashboard() {
-  const [section, setSection] = useState<ExtendedSection>('overview');
+  const [section, setSection] = useState<ExtendedSection>(sectionFromHash);
   const { isPasswordRecovery } = useAuth(); // Use state from AuthContext
+
+  // Keep the URL hash in sync with the active section, so the browser's
+  // Back/Forward buttons move between sections of the app instead of
+  // leaving it entirely. Previously nothing ever changed the URL, so
+  // there was no in-app history for Back to step through — it skipped
+  // straight past the whole app.
+  useEffect(() => {
+    // While a password-recovery hash (#access_token=...&type=recovery) is
+    // being handled, leave the URL alone — PasswordRecoveryModal cleans
+    // that up itself once the password update succeeds.
+    if (isPasswordRecovery) return;
+
+    // Establish a baseline history entry for whatever section we're
+    // already showing, without adding an extra entry to the stack.
+    window.history.replaceState({ section }, '', `#/${section}`);
+
+    function handlePopState(event: PopStateEvent) {
+      const next = (event.state?.section as ExtendedSection | undefined) ?? sectionFromHash();
+      setSection(next);
+    }
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPasswordRecovery]);
+
+  function navigate(next: ExtendedSection) {
+    setSection((current) => {
+      if (next !== current) {
+        window.history.pushState({ section: next }, '', `#/${next}`);
+      }
+      return next;
+    });
+  }
 
   return (
     <>
       {isPasswordRecovery && <PasswordRecoveryModal />}
-      <DashboardLayout active={section as DashboardSection} onNavigate={(s) => setSection(s as ExtendedSection)}>
-        {section === 'overview' && <Overview onNavigate={setSection} />}
+      <DashboardLayout active={section as DashboardSection} onNavigate={(s) => navigate(s as ExtendedSection)}>
+        {section === 'overview' && <Overview onNavigate={navigate} />}
         {section === 'tutor' && <PersonalTutor />}
         {section === 'training' && <TrainingPortal />}
         {section === 'assessment' && <SkillsAssessment />}
